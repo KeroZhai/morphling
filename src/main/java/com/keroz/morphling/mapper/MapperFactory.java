@@ -216,9 +216,11 @@ public final class MapperFactory {
                                         .append(".valueOf(")
                                         .append(sourceValue).append("), mapperFactory));");
                             } else {
-                                bodyBuilder
-                                        .append(sourceValue).append("), mapperFactory);");
+                                bodyBuilder.append(sourceValue).append(", mapperFactory));");
                             }
+
+                            bodyBuilder.append("}}");
+
                             continue;
                         }
                     }
