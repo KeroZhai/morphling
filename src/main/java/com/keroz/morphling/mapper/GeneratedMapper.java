@@ -1,8 +1,5 @@
 package com.keroz.morphling.mapper;
 
-import java.lang.reflect.AnnotatedType;
-import java.util.Collection;
-
 public abstract class GeneratedMapper implements Mapper<Object, Object> {
 
     public abstract void map(Object source, Object target, Class<?>[] ignoreGroups, Context context);
@@ -22,7 +19,7 @@ public abstract class GeneratedMapper implements Mapper<Object, Object> {
     }
 
     @Override
-    public Object map(Object source, Class<?>[] ignoreGroups) {
+    public Object map(Object source, Class<?>... ignoreGroups) {
         Context context = Context.Factory.INSTANCE.getContext();
 
         Object target = map(source, ignoreGroups, context);
@@ -33,7 +30,7 @@ public abstract class GeneratedMapper implements Mapper<Object, Object> {
     }
 
     @Override
-    public void map(Object source, Object target, Class<?>[] ignoreGroups) {
+    public void map(Object source, Object target, Class<?>... ignoreGroups) {
         Context context = Context.Factory.INSTANCE.getContext();
         map(source, target, ignoreGroups, context);
         Context.Factory.INSTANCE.release(context);
@@ -46,7 +43,7 @@ public abstract class GeneratedMapper implements Mapper<Object, Object> {
 
     @Override
     public void map(Object source, Object target) {
-        map(source, target, null);
+        map(source, target, (Class<?>[]) null);
     }
 
 }
