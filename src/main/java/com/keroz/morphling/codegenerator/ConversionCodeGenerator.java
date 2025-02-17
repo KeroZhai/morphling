@@ -1,7 +1,5 @@
 package com.keroz.morphling.codegenerator;
 
-import java.lang.reflect.Type;
-
 /**
  * Generate conversion code from source type to target type.
  * <p>
@@ -15,7 +13,7 @@ import java.lang.reflect.Type;
  * Since Morphling uses Javassist internally, implementing a custom
  * {@code ConversionCodeGenerator} may requires familiarity with it.
  *
- * @see SimpleTypeConversionCodeGenerator
+ * @see ImmutableTypeConversionCodeGenerator
  */
 public interface ConversionCodeGenerator {
 
@@ -23,11 +21,10 @@ public interface ConversionCodeGenerator {
      * Whether the conversion from the given {@code sourceType} to
      * {@code targetType} is supported or not.
      *
-     * @param sourceType
-     * @param targetType
+     * @param context
      * @return {@code true} or {@code false}
      */
-    boolean isSupported(Type sourceType, Type targetType);
+    boolean isSupported(GenerationContext context);
 
     /**
      * Generates the conversion code.
@@ -44,10 +41,9 @@ public interface ConversionCodeGenerator {
      * </code>
      * </pre>
      *
-     * @param sourceType
-     * @param targetType
+     * @param context
      * @return the generated code.
      */
-    String generate(Type sourceType, Type targetType);
+    String generate(GenerationContext context);
 
 }

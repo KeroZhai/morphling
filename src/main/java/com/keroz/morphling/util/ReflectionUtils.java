@@ -1,18 +1,29 @@
 package com.keroz.morphling.util;
 
+import java.io.File;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Currency;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import lombok.experimental.UtilityClass;
 
@@ -115,14 +126,31 @@ public class ReflectionUtils {
                 || Long.class.equals(type) || Float.class.equals(type) || Double.class.equals(type);
     }
 
-    public boolean isSimpleType(Type type) {
+    public boolean isImmutableType(Type type) {
         if (type instanceof Class) {
             Class<?> classType = (Class<?>) type;
-            return isPrimitiveOrWrapperType(classType) || classType.isEnum()
-                    || String.class.equals(classType) || Date.class.equals(classType);
+            return isPrimitiveOrWrapperType(classType)
+                    || isNumberType(type)
+                    || classType.isEnum()
+                    || String.class.equals(classType)
+                    || Date.class.equals(classType)
+                    || UUID.class.equals(classType)
+                    || URL.class.equals(classType)
+                    || URI.class.equals(classType)
+                    || Locale.class.equals(classType)
+                    || File.class.equals(classType)
+                    || Inet4Address.class.equals(classType)
+                    || Inet6Address.class.equals(classType)
+                    || InetSocketAddress.class.equals(classType)
+                    || Currency.class.equals(classType)
+                    || isJava8TImeType(classType);
         } else {
             return false;
         }
+    }
+
+    public boolean isCollectionType(AnnotatedType annotatedType) {
+        return isCollectionType(annotatedType.getType());
     }
 
     public boolean isCollectionType(Type type) {
@@ -131,6 +159,18 @@ public class ReflectionUtils {
 
     public boolean isMapType(Type type) {
         return Map.class.isAssignableFrom(toClass(type));
+    }
+
+    public boolean isNumberType(Type type) {
+        return Number.class.isAssignableFrom(toClass(type));
+    }
+
+    public boolean isJava8TImeType(Type type) {
+        return toClass(type).getName().startsWith("java.time.");
+    }
+
+    public boolean isOptionalType(Type type) {
+        return toClass(type).equals(java.util.Optional.class);
     }
 
     public Class<?> toWrapper(Type primitiveType) {
@@ -183,4 +223,23 @@ public class ReflectionUtils {
         return !isEmpty(value);
     }
 
+    public String getSimpleTypeName(Type type) {
+        if (type instanceof Class) {
+            return ((Class<?>) type).getName();
+        } else if (type instanceof ParameterizedType) {
+            return getSimpleTypeName(((ParameterizedType) type).getRawType());
+        }
+
+        return type.toString();
+    }
+
+    public <A extends Annotation> A getAnnotation(Type type, Class<A> annotationClass) {
+        if (type instanceof Class) {
+            return ((Class<?>) type).getAnnotation(annotationClass);
+        } else if (type instanceof ParameterizedType) {
+            return getAnnotation(((ParameterizedType) type).getRawType(), annotationClass);
+        }
+
+        return null;
+    }
 }

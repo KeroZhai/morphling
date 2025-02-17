@@ -4,21 +4,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.Date;
 
-import com.keroz.morphling.codegenerator.SimpleTypeConversionCodeGenerator;
-import com.keroz.morphling.mapper.Mapper;
-import com.keroz.morphling.mapper.MapperFactory;
-
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import com.keroz.morphling.codegenerator.ImmutableTypeConversionCodeGenerator;
+import com.keroz.morphling.mapper.Mapper;
+import com.keroz.morphling.mapper.MapperFactory;
+
 import lombok.Data;
 
-/**
- * Primitive types(and their corresponding wrapper types), String, Enum and
- * java.util.Date
- * are considered as simple types.
- */
-public class SimpleTypeMappingTest {
+public class ImmutableTypeMappingTest {
 
     public static enum State {
         ON, OFF;
@@ -37,6 +32,7 @@ public class SimpleTypeMappingTest {
         private String stringValue = "name";
         private State enumValue = State.ON;
         private Date dateValue = new Date();
+        private int emptyIntValue;
     }
 
     @Data
@@ -52,13 +48,14 @@ public class SimpleTypeMappingTest {
         private String stringValue;
         private State enumValue;
         private Date dateValue;
+        private int emptyIntValue;
     }
 
     private static MapperFactory mapperFactory = new MapperFactory();
 
     @BeforeAll
     public static void beforeAll() {
-        mapperFactory.addConversionCodeGenerator(new SimpleTypeConversionCodeGenerator());
+        mapperFactory.addConversionCodeGenerator(new ImmutableTypeConversionCodeGenerator());
     }
 
     @Test
@@ -67,17 +64,18 @@ public class SimpleTypeMappingTest {
         Mapper<Source1, Target1> mapper = mapperFactory.getMapperFor(Source1.class, Target1.class);
         Target1 target = mapper.map(source);
 
-        assertEquals(target.isBooleanValue(), source.isBooleanValue());
-        assertEquals(target.getByteValue(), source.getByteValue());
-        assertEquals(target.getCharValue(), source.getCharValue());
-        assertEquals(target.getShortValue(), source.getShortValue());
-        assertEquals(target.getIntValue(), source.getIntValue());
-        assertEquals(target.getLongValue(), source.getLongValue());
-        assertEquals(target.getFloatValue(), source.getFloatValue());
-        assertEquals(target.getDoubleValue(), source.getDoubleValue());
-        assertEquals(target.getStringValue(), source.getStringValue());
-        assertEquals(target.getEnumValue(), source.getEnumValue());
-        assertEquals(target.getDateValue(), source.getDateValue());
+        assertEquals(source.isBooleanValue(), target.isBooleanValue());
+        assertEquals(source.getByteValue(), target.getByteValue());
+        assertEquals(source.getCharValue(), target.getCharValue());
+        assertEquals(source.getShortValue(), target.getShortValue());
+        assertEquals(source.getIntValue(), target.getIntValue());
+        assertEquals(source.getLongValue(), target.getLongValue());
+        assertEquals(source.getFloatValue(), target.getFloatValue());
+        assertEquals(source.getDoubleValue(), target.getDoubleValue());
+        assertEquals(source.getStringValue(), target.getStringValue());
+        assertEquals(source.getEnumValue(), target.getEnumValue());
+        assertEquals(source.getDateValue(), target.getDateValue());
+        assertEquals(source.getEmptyIntValue(), target.getEmptyIntValue());
     }
 
     @Data
@@ -110,14 +108,14 @@ public class SimpleTypeMappingTest {
         Mapper<Source2, Target2> mapper = mapperFactory.getMapperFor(Source2.class, Target2.class);
         Target2 target = mapper.map(source);
 
-        assertEquals(target.isBooleanValue(), source.getBooleanValue());
-        assertEquals(target.getByteValue(), source.getByteValue());
-        assertEquals(target.getCharValue(), source.getCharValue());
-        assertEquals(target.getShortValue(), source.getShortValue());
-        assertEquals(target.getIntValue(), source.getIntValue());
-        assertEquals(target.getLongValue(), source.getLongValue());
-        assertEquals(target.getFloatValue(), source.getFloatValue());
-        assertEquals(target.getDoubleValue(), source.getDoubleValue());
+        assertEquals(source.getBooleanValue(), target.isBooleanValue());
+        assertEquals(source.getByteValue(), target.getByteValue());
+        assertEquals(source.getCharValue(), target.getCharValue());
+        assertEquals(source.getShortValue(), target.getShortValue());
+        assertEquals(source.getIntValue(), target.getIntValue());
+        assertEquals(source.getLongValue(), target.getLongValue());
+        assertEquals(source.getFloatValue(), target.getFloatValue());
+        assertEquals(source.getDoubleValue(), target.getDoubleValue());
 
         Mapper<Target2, Source2> reverseMapper = mapperFactory.getMapperFor(Target2.class, Source2.class);
         target.setBooleanValue(false);
@@ -133,4 +131,5 @@ public class SimpleTypeMappingTest {
         assertEquals(target.getFloatValue(), target2.getFloatValue());
         assertEquals(target.getDoubleValue(), target2.getDoubleValue());
     }
+
 }

@@ -2,23 +2,16 @@ package com.keroz.morphling;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
-import com.keroz.morphling.codegenerator.ArrayTypeConversionCodeGenerator;
+import org.junit.jupiter.api.Test;
+
 import com.keroz.morphling.mapper.Mapper;
 import com.keroz.morphling.mapper.MapperFactory;
-
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 
 import lombok.Data;
 
 public class ArrayTypeMappingTest {
 
-    private static MapperFactory mapperFactory = new MapperFactory();
-
-    @BeforeAll
-    public static void beforeAll() {
-        mapperFactory.addConversionCodeGenerator(new ArrayTypeConversionCodeGenerator());
-    }
+    private static MapperFactory mapperFactory = MapperFactory.defaultMapperFactory();
 
     @Data
     public static class Source1 {

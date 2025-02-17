@@ -1,5 +1,6 @@
 package com.keroz.morphling.mapper;
 
+import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
@@ -9,16 +10,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
-import com.keroz.morphling.annotation.AliasFor;
 import com.keroz.morphling.annotation.MapperIgnore;
 import com.keroz.morphling.annotation.MapperIgnore.Excluded;
-import com.keroz.morphling.annotation.MapperIgnore.Policy;
 import com.keroz.morphling.annotation.MapperIgnore.Included;
+import com.keroz.morphling.annotation.MapperIgnore.Policy;
+import com.keroz.morphling.annotation.Mapping;
 import com.keroz.morphling.codegenerator.ArrayTypeConversionCodeGenerator;
 import com.keroz.morphling.codegenerator.CollectionTypeConversionCodeGenerator;
 import com.keroz.morphling.codegenerator.ConversionCodeGenerator;
+import com.keroz.morphling.codegenerator.GenerationContext;
+import com.keroz.morphling.codegenerator.ImmutableTypeConversionCodeGenerator;
 import com.keroz.morphling.codegenerator.NestedTypeConversionCodeGenerator;
-import com.keroz.morphling.codegenerator.SimpleTypeConversionCodeGenerator;
+import com.keroz.morphling.codegenerator.OptionalTypeConversionCodeGenerator;
 import com.keroz.morphling.converter.Converter;
 import com.keroz.morphling.exception.MethodNotFoundException;
 import com.keroz.morphling.util.JavassistUtils;
@@ -30,9 +33,6 @@ import javassist.ClassPool;
 import javassist.CtClass;
 import javassist.CtField;
 import javassist.CtMethod;
-import javassist.bytecode.SignatureAttribute.ClassSignature;
-import javassist.bytecode.SignatureAttribute.ClassType;
-import javassist.bytecode.SignatureAttribute.TypeArgument;
 
 /**
  * 123
@@ -41,9 +41,11 @@ public final class MapperFactory {
 
     private final String uniqueId = UUID.randomUUID().toString().substring(0, 8);
     private ClassPool POOL = ClassPool.getDefault();
-    private CtClass mapperInterfaceCtClass = JavassistUtils.getCtClass(POOL, "com.keroz.morphling.mapper.Mapper");
+    private CtClass abstractMapperCtClass = JavassistUtils.getCtClass(POOL,
+            "com.keroz.morphling.mapper.GeneratedMapper");
     private CtClass objectCtClass = JavassistUtils.getCtClass(POOL, "java.lang.Object");
     private List<ConversionCodeGenerator> conversionCodeGenerators = new ArrayList<>();
+    private HashMap<Class<?>, ObjectFactory<?>> fallbackObjecFactories = new HashMap<>();
 
     @SuppressWarnings("rawtypes")
     private HashMap<String, Mapper> generatedMapperMap = new HashMap<>();
@@ -58,10 +60,13 @@ public final class MapperFactory {
     public static MapperFactory defaultMapperFactory() {
         MapperFactory instance = new MapperFactory();
 
-        instance.addConversionCodeGenerator(new SimpleTypeConversionCodeGenerator());
         instance.addConversionCodeGenerator(new ArrayTypeConversionCodeGenerator());
         instance.addConversionCodeGenerator(new CollectionTypeConversionCodeGenerator());
         instance.addConversionCodeGenerator(new NestedTypeConversionCodeGenerator());
+        instance.addConversionCodeGenerator(new OptionalTypeConversionCodeGenerator());
+        instance.addConversionCodeGenerator(new ImmutableTypeConversionCodeGenerator());
+
+        instance.addFallbackObjectFactory(List.class, (source) -> new ArrayList<>());
 
         return instance;
     }
@@ -87,9 +92,8 @@ public final class MapperFactory {
     }
 
     public Class<?> generateMapperClassFor(Class<?> sourceClass, Class<?> targetClass) {
-        CtClass sourceCtClass = JavassistUtils.getCtClass(POOL, sourceClass.getName());
-        CtClass targetCtClass = JavassistUtils.getCtClass(POOL, targetClass.getName());
         CtClass groupsCtClass = JavassistUtils.getCtClass(POOL, Class[].class.getName());
+        CtClass contextCtClass = JavassistUtils.getCtClass(POOL, Context.class.getName());
 
         try {
             CtClass mapperCtClass = POOL.makeClass(generateMapperClassNameFor(sourceClass, targetClass));
@@ -99,49 +103,64 @@ public final class MapperFactory {
             mapperFactoryField.setModifiers(Modifier.PUBLIC);
             mapperCtClass.addField(mapperFactoryField);
 
-            CtMethod mapMethod = new CtMethod(CtClass.voidType,
-                    "map", new CtClass[] { sourceCtClass, targetCtClass, groupsCtClass }, mapperCtClass);
-            String targetClassName = targetClass.getName();
             StringBuilder bodyBuilder = new StringBuilder("{\n");
-            ClassSignature classSignature = new ClassSignature(null, null,
-                    new ClassType[] { new ClassType(Mapper.class.getName(),
-                            new TypeArgument[] { new TypeArgument(new ClassType(sourceClass.getName())),
-                                    new TypeArgument(new ClassType(targetClass.getName())) }) });
 
-            mapperCtClass.setInterfaces(new CtClass[] { mapperInterfaceCtClass });
-            mapperCtClass.setGenericSignature(classSignature.encode());
+            mapperCtClass.setSuperclass(abstractMapperCtClass);
+
+            String sourceClassName = sourceClass.getName();
+            String targetClassName = targetClass.getName();
+            CtMethod instantiateMethod = new CtMethod(objectCtClass, "instantiate", new CtClass[] { objectCtClass }, mapperCtClass);
+            instantiateMethod.setModifiers(Modifier.PUBLIC);
+            instantiateMethod.setBody(generateInstantiateMethodBody(sourceClass, targetClass));
+            mapperCtClass.addMethod(instantiateMethod);
+
+            CtMethod mapMethod = new CtMethod(CtClass.voidType, "map",
+                    new CtClass[] { objectCtClass, objectCtClass, groupsCtClass, contextCtClass }, mapperCtClass);
             mapMethod.setModifiers(Modifier.PUBLIC);
-            bodyBuilder.append(targetClassName).append(" target = $2;\n");
+            bodyBuilder.append(sourceClassName).append(" source = ").append("(").append(sourceClassName).append(") $1;")
+                    .append(targetClassName)
+                    .append(" target = ").append("(").append(targetClassName)
+                    .append(") $2; Class[] ignoreGroups = $3; Context context = $4;");
 
             for (Field targetField : ReflectionUtils.getDeclaredAndInheritedFields(targetClass)) {
                 String targetFieldName = targetField.getName();
                 String sourceFieldName = targetFieldName;
-                Type targetFieldType = targetField.getGenericType();
+                AnnotatedType targetFieldType = targetField.getAnnotatedType();
 
-                AliasFor aliasForAnnotation = targetField.getAnnotation(AliasFor.class);
+                Mapping mapping = targetField.getAnnotation(Mapping.class);
 
-                if (aliasForAnnotation != null) {
-                    sourceFieldName = aliasForAnnotation.value();
+                if (mapping != null) {
+                    String alias = mapping.alias();
+
+                    if (!alias.isEmpty()) {
+                        sourceFieldName = alias;
+                    }
                 }
 
                 Field sourceField = ReflectionUtils.findDeclaredOrInheritedField(sourceClass, sourceFieldName);
 
                 // Check if sourceClass has the field with the same name
                 if (sourceField != null) {
-                    Type sourceFieldType = sourceField.getGenericType();
-                    String getterPrefix = "boolean".equals(sourceFieldType.getTypeName()) ? "is" : "get";
+                    AnnotatedType sourceFieldType = sourceField.getAnnotatedType();
+                    String getterPrefix = "boolean".equals(sourceFieldType.getType().getTypeName()) ? "is" : "get";
                     String capitalizedSourceFieldName = StringUtils.capitalize(sourceFieldName);
                     String capitalizedTargetFieldName = StringUtils.capitalize(targetFieldName);
                     String getterName = getterPrefix + capitalizedSourceFieldName;
                     String setter = "target.set" + capitalizedTargetFieldName;
-                    String sourceValue = "$1." + getterName + "()";
-                    String sourceFieldNonGenericTypeName = getNonGenericTypeName(sourceFieldType);
-                    String targetFieldNonGenericTypeName = getNonGenericTypeName(targetFieldType);
+                    String sourceValue = "source." + getterName + "()";
+                    String sourceFieldNonGenericTypeName = getNonGenericTypeName(sourceFieldType.getType());
+                    String targetFieldNonGenericTypeName = getNonGenericTypeName(targetFieldType.getType());
 
                     MapperIgnore mapperIgnoreAnnotation = targetField.getAnnotation(MapperIgnore.class);
                     Class<?>[] groups = null;
                     Policy ignorePolicy = null;
                     boolean hasGroups = false;
+                    GenerationContext generationContext = GenerationContext.builder()
+                            .sourceType(sourceFieldType)
+                            .targetType(targetFieldType)
+                            .generators(conversionCodeGenerators)
+                            .mapping(mapping)
+                            .build();
 
                     if (mapperIgnoreAnnotation != null) {
                         ignorePolicy = mapperIgnoreAnnotation.policy();
@@ -156,23 +175,24 @@ public final class MapperFactory {
                             if (hasGroups) {
                                 Class<?> lastGroup = groups[groups.length - 1];
 
-                                bodyBuilder.append("if ($3 != null && $3.length > 0) {")
-                                        .append("for (int i = 0; i < $3.length; i++) {")
-                                        .append("if ($3[i] == ").append(lastGroup.getName()).append(".class) { ")
+                                bodyBuilder.append("if (ignoreGroups != null && ignoreGroups.length > 0) {")
+                                        .append("for (int i = 0; i < ignoreGroups.length; i++) {")
+                                        .append("if (ignoreGroups[i] == ").append(lastGroup.getName())
+                                        .append(".class) { ")
                                         .append("shouldIgnore = ").append(Excluded.class.isAssignableFrom(lastGroup))
                                         .append("; break; }}} else { shouldIgnore = ")
                                         .append(Included.class.isAssignableFrom(lastGroup)).append("; }");
                             }
 
-                            bodyBuilder.append(sourceFieldNonGenericTypeName).append(" sv = ")
+                            bodyBuilder.append(sourceFieldNonGenericTypeName).append(" ").append(generationContext.getSourceVariableName()).append(" = ")
                                     .append(sourceValue).append(";");
                             switch (ignorePolicy) {
                                 case IGNORE_NULL: {
-                                    bodyBuilder.append("shouldIgnore = shouldIgnore || sv == null;");
+                                    bodyBuilder.append("shouldIgnore = shouldIgnore || ").append(generationContext.getSourceVariableName()).append(" == null;");
                                     break;
                                 }
                                 case IGNORE_EMPTY: {
-                                    bodyBuilder.append("shouldIgnore = shouldIgnore || ReflectionUtils.isEmpty(sv);");
+                                    bodyBuilder.append("shouldIgnore = shouldIgnore || ReflectionUtils.isEmpty(").append(generationContext.getSourceVariableName()).append(");");
                                     break;
                                 }
                                 default: {
@@ -182,57 +202,60 @@ public final class MapperFactory {
                             bodyBuilder.append("if (!shouldIgnore) {");
                         }
                     } else {
-                        bodyBuilder.append("{{").append(sourceFieldNonGenericTypeName).append(" sv = ")
+                        // Double curly braces to match cases with and without MapperIgnore annotation
+                        bodyBuilder.append("{{").append(sourceFieldNonGenericTypeName).append(" ").append(generationContext.getSourceVariableName()).append(" = ")
                                 .append(sourceValue).append(";");
                     }
 
                     // check if converter specified
-                    com.keroz.morphling.annotation.Converter converterAnnotation = targetField
-                            .getAnnotation(com.keroz.morphling.annotation.Converter.class);
+                    if (mapping != null) {
+                        Class<? extends Converter> converterClass = mapping.converter();
 
-                    if (converterAnnotation != null) {
-                        Class<? extends Converter<?, ?>> converterClass = converterAnnotation.value();
-                        String className = converterClass.getName();
-                        Converter<?, ?> converter = converterMap.get(className);
+                        if (converterClass != Converter.class) {
+                            String className = converterClass.getName();
+                            Converter converter = converterMap.get(className);
 
-                        if (converter == null) {
-                            try {
-                                converter = (Converter<?, ?>) converterClass.newInstance();
-                                converterMap.put(className, converter);
-                            } catch (InstantiationException | IllegalAccessException e) {
-                                e.printStackTrace();
+                            if (converter == null) {
+                                try {
+                                    converter = (Converter<?, ?>) converterClass.newInstance();
+                                    converterMap.put(className, converter);
+                                } catch (InstantiationException | IllegalAccessException e) {
+                                    e.printStackTrace();
+                                }
+
+                                // use converter to convert value
+                                bodyBuilder.append(setter).append("((").append(targetFieldNonGenericTypeName)
+                                        .append(") mapperFactory.getConverter(\"")
+                                        .append(className)
+                                        .append("\").convert(");
+
+                                // boxing for primitive types
+                                if (ReflectionUtils.isPrimitiveType(sourceFieldType.getType())) {
+                                    bodyBuilder
+                                            .append(ReflectionUtils.toWrapper(sourceFieldType.getType()).getName())
+                                            .append(".valueOf(")
+                                            .append(sourceValue).append("), mapperFactory));");
+                                } else {
+                                    bodyBuilder.append(sourceValue).append(", mapperFactory));");
+                                }
+
+                                bodyBuilder.append("}}");
+
+                                continue;
                             }
-
-                            // use converter to convert value
-                            bodyBuilder.append(setter).append("((").append(targetFieldNonGenericTypeName)
-                                    .append(") mapperFactory.getConverter(\"")
-                                    .append(className)
-                                    .append("\").convert(");
-
-                            // boxing for primitive types
-                            if (ReflectionUtils.isPrimitiveType(sourceFieldType)) {
-                                bodyBuilder
-                                        .append(ReflectionUtils.toWrapper(sourceFieldType).getName())
-                                        .append(".valueOf(")
-                                        .append(sourceValue).append("), mapperFactory));");
-                            } else {
-                                bodyBuilder.append(sourceValue).append(", mapperFactory));");
-                            }
-
-                            bodyBuilder.append("}}");
-
-                            continue;
                         }
                     }
 
                     for (ConversionCodeGenerator codeGenerator : conversionCodeGenerators) {
-                        if (codeGenerator.isSupported(sourceFieldType, targetFieldType)) {
-                            String code = codeGenerator.generate(sourceFieldType, targetFieldType);
+                        if (codeGenerator.isSupported(generationContext)) {
+                            String code = codeGenerator.generate(generationContext);
 
                             if (code != null) {
                                 bodyBuilder.append(targetFieldNonGenericTypeName)
-                                        .append(" tv;").append(code)
-                                        .append(setter).append("(tv);\n");
+                                        .append(" ").append(generationContext.getTargetVariableName())
+                                        .append(";").append(code)
+                                        .append(setter).append("(").append(generationContext.getTargetVariableName())
+                                        .append(");\n");
                             }
 
                             break;
@@ -247,47 +270,6 @@ public final class MapperFactory {
             System.out.println(body);
             mapMethod.setBody(body);
             mapperCtClass.addMethod(mapMethod);
-
-            CtMethod bridgeMethod = new CtMethod(CtClass.voidType,
-                    "map", new CtClass[] { objectCtClass, objectCtClass, groupsCtClass }, mapperCtClass);
-
-            bridgeMethod
-                    .setBody("{ map((" + sourceClass.getName() + ") $1, (" + targetClass.getName() + ") $2, $3); }");
-            mapperCtClass.addMethod(bridgeMethod);
-
-            CtMethod mapMethod2 = new CtMethod(targetCtClass, "map", new CtClass[] { sourceCtClass }, mapperCtClass);
-            mapMethod2.setBody("{ " + targetClassName + " target = new " + targetClassName
-                    + "(); map($1, target, null); return target; }");
-            mapperCtClass.addMethod(mapMethod2);
-
-            CtMethod bridgeMethod2 = new CtMethod(objectCtClass,
-                    "map", new CtClass[] { objectCtClass }, mapperCtClass);
-
-            bridgeMethod2.setBody("{ return map((" + sourceClass.getName() + ") $1); }");
-            mapperCtClass.addMethod(bridgeMethod2);
-
-            CtMethod mapMethod3 = new CtMethod(targetCtClass, "map", new CtClass[] { sourceCtClass, groupsCtClass },
-                    mapperCtClass);
-            mapMethod3.setBody("{ " + targetClassName + " target = new " + targetClassName
-                    + "(); map($1, target, $2); return target; }");
-            mapperCtClass.addMethod(mapMethod3);
-
-            CtMethod bridgeMethod3 = new CtMethod(objectCtClass,
-                    "map", new CtClass[] { objectCtClass, groupsCtClass }, mapperCtClass);
-
-            bridgeMethod3.setBody("{ return map((" + sourceClass.getName() + ") $1, $2); }");
-            mapperCtClass.addMethod(bridgeMethod3);
-
-            CtMethod mapMethod4 = new CtMethod(CtClass.voidType, "map", new CtClass[] { sourceCtClass, targetCtClass },
-                    mapperCtClass);
-            mapMethod4.setBody("{ map($1, $2, null); }");
-            mapperCtClass.addMethod(mapMethod4);
-
-            CtMethod bridgeMethod4 = new CtMethod(CtClass.voidType,
-                    "map", new CtClass[] { objectCtClass, objectCtClass }, mapperCtClass);
-
-            bridgeMethod4.setBody("{ map((" + sourceClass.getName() + ") $1, (" + targetClass.getName() + ") $2); }");
-            mapperCtClass.addMethod(bridgeMethod4);
 
             Class<?> mapperClass = mapperCtClass.toClass();
             mapperCtClass.detach();
@@ -312,6 +294,21 @@ public final class MapperFactory {
         return converterMap.get(converterClassName);
     }
 
+    public <T> void addFallbackObjectFactory(Class<T> targetClass, ObjectFactory<T> objectFactory) {
+        fallbackObjecFactories.put(targetClass, objectFactory);
+    }
+
+    public <T> T getFallbackObject(Object source, Class<T> targetClass) {
+        @SuppressWarnings("unchecked")
+        ObjectFactory<T> objectFactory = (ObjectFactory<T>) fallbackObjecFactories.get(targetClass);
+
+        if (objectFactory != null) {
+            return objectFactory.create(source);
+        }
+
+        return null;
+    }
+
     private String generateMapperClassNameFor(Class<?> sourceClass, Class<?> targetClass) {
 
         return StringUtils.classNameToPascalCase(sourceClass.getName()) + "To"
@@ -327,4 +324,26 @@ public final class MapperFactory {
 
         return typeName;
     }
+
+    private String generateInstantiateMethodBody(Class<?> sourceClass, Class<?> targetClass) {
+        StringBuilder bodyBuilder = new StringBuilder("{ try {");
+
+        if (targetClass.isInterface() || Modifier.isAbstract(targetClass.getModifiers())) {
+            if (targetClass.isAssignableFrom(sourceClass)) {
+                bodyBuilder.append("return $1.getClass().newInstance();");
+            } else {
+                bodyBuilder.append("throw new InstantiationException(\"Cannot instantiate interface or abstract class\");");
+            }
+        } else {
+            bodyBuilder.append("return new ").append(targetClass.getName()).append("();");
+        }
+
+        bodyBuilder.append("} catch (Throwable e) { return mapperFactory.getFallbackObject($1, ")
+                .append(targetClass.getName()).append(".class); } }");
+
+        return bodyBuilder.toString();
+    }
+
+
+
 }
