@@ -48,7 +48,7 @@ public final class MapperFactory {
     private HashMap<Class<?>, ObjectFactory<?>> fallbackObjecFactories = new HashMap<>();
 
     @SuppressWarnings("rawtypes")
-    private HashMap<String, Mapper> generatedMapperMap = new HashMap<>();
+    private HashMap<MapperKey, Mapper> generatedMapperMap = new HashMap<>();
     @SuppressWarnings("rawtypes")
     private HashMap<String, Converter> converterMap = new HashMap<>();
 
@@ -73,15 +73,14 @@ public final class MapperFactory {
 
     @SuppressWarnings("unchecked")
     public <Source, Target> Mapper<Source, Target> getMapperFor(Class<Source> sourceClass, Class<Target> targetClass) {
-        String mapperClassName = generateMapperClassNameFor(sourceClass, targetClass);
-
-        Mapper<Source, Target> mapper = generatedMapperMap.get(mapperClassName);
+        MapperKey mapperKey = MapperKey.of(sourceClass, targetClass);
+        Mapper<Source, Target> mapper = generatedMapperMap.get(mapperKey);
 
         if (mapper == null) {
             try {
                 mapper = (Mapper<Source, Target>) generateMapperClassFor(sourceClass, targetClass).newInstance();
                 mapper.getClass().getDeclaredField("mapperFactory").set(mapper, this);
-                generatedMapperMap.put(mapperClassName, mapper);
+                generatedMapperMap.put(mapperKey, mapper);
             } catch (InstantiationException | IllegalAccessException | IllegalArgumentException | NoSuchFieldException
                     | SecurityException e) {
                 e.printStackTrace();
