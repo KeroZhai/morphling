@@ -28,8 +28,11 @@ public class NestedTypeConversionCodeGenerator implements ConversionCodeGenerato
         String sourceTypeName = context.getSourceType().getType().getTypeName();
         String targetTypeName = targetType.getType().getTypeName();
         StringBuilder builder = new StringBuilder();
+
         builder.append(context.defineInitialValueType())
-                .append("if (").append(context.addSuffix("initialValueType")).append("!= null) {")
+                .append("if (").append(context.getSourceVariableName()).append(" == null) {")
+                .append(context.getTargetVariableName()).append(" = null;")
+                .append("} else if (").append(context.addSuffix("initialValueType")).append("!= null) {")
                 .append("GeneratedMapper " + context.addSuffix("mapper")
                         + " = (GeneratedMapper) mapperFactory.getMapperFor("
                         + context.getSourceVariableName() + ".getClass(), "
