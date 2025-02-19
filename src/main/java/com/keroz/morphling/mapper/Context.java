@@ -1,12 +1,12 @@
 package com.keroz.morphling.mapper;
 
+import java.util.IdentityHashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class Context {
 
-    private Map<Object, Object> cache = new ConcurrentHashMap<>();
+    private Map<Object, Object> cache = new IdentityHashMap<>();
 
     public void put(Object source, Object target) {
         cache.put(source, target);
