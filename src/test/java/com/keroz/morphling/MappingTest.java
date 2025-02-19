@@ -1,6 +1,8 @@
 package com.keroz.morphling;
 
+import static org.junit.Assert.assertNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -9,7 +11,9 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import com.keroz.morphling.MappingTest.DepartmentDto.IncludingParent;
 import com.keroz.morphling.annotation.Mapping;
+import com.keroz.morphling.annotation.Mapping.ValueStrategy;
 import com.keroz.morphling.mapper.Mapper;
 import com.keroz.morphling.mapper.MapperFactory;
 
@@ -168,6 +172,66 @@ public class MappingTest {
 
         assertEquals("Ford", parkingLotDto.getVehicles().get(1).getBrand());
         assertEquals(4, ((TruckDto) parkingLotDto.getVehicles().get(1)).getNumberOfWheels());
+    }
+
+    @Data
+    public static class Department {
+
+        private Department parent;
+
+        private List<Department> children;
+
+        private String nullValue;
+
+        private String emptyValue = "";
+    }
+
+    @Data
+    public static class DepartmentDto {
+
+        @Mapping(when = IncludingParent.class)
+        private DepartmentDto parent;
+
+        @Mapping(unless = IncludingParent.class)
+        private List<DepartmentDto> children;
+
+        @Mapping(valueStrategy = ValueStrategy.IF_NOT_NULL)
+        private String nullValue = "nonNull";
+
+        @Mapping(valueStrategy = ValueStrategy.IF_NOT_EMPTY)
+        private String emptyValue = "nonEmpty";
+
+        public static interface IncludingParent {
+        }
+
+    }
+
+    @Test
+    public void testMappingGroupsAndValueStrategy() {
+        Department parent = new Department();
+        Department department = new Department();
+
+        department.setParent(parent);
+
+        Department child1 = new Department();
+        child1.setParent(department);
+        Department child2 = new Department();
+        child2.setParent(department);
+
+        department.setChildren(Arrays.asList(child1, child2));
+
+        Mapper<Department, DepartmentDto> mapper = mapperFactory.getMapperFor(Department.class, DepartmentDto.class);
+        DepartmentDto departmentDto = mapper.map(department);
+
+        assertNull(departmentDto.getParent());
+        assertEquals(departmentDto.getChildren().size(), 2);
+        assertEquals(departmentDto.getNullValue(), "nonNull");
+        assertEquals(departmentDto.getEmptyValue(), "nonEmpty");
+
+        departmentDto = mapper.map(department, IncludingParent.class);
+
+        assertNotNull(departmentDto.getParent());
+        assertNull(departmentDto.getChildren());
     }
 
 }

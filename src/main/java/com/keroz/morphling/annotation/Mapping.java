@@ -20,6 +20,24 @@ public @interface Mapping {
 
     InitialValueTypeMapping[] initialValueTypeMappings() default {};
 
+    ValueStrategy valueStrategy() default ValueStrategy.DEFAULT;
+
+    /**
+     * The condition to apply the mapping.
+     * <p>
+     * Note: this attribute cannot be used with the {@link #unless()} attribute. If
+     * both are present, this attribute will take precedence.
+     */
+    Class<?>[] when() default {};
+
+    /**
+     * The condition to not apply the mapping.
+     * <p>
+     * Note: this attribute cannot be used with the {@link #when()} attribute. If
+     * both are present, {@link #when()} will take precedence.
+     */
+    Class<?>[] unless() default {};
+
     @Documented
     @Retention(RetentionPolicy.RUNTIME)
     @Target({ ElementType.TYPE_USE })
@@ -43,6 +61,12 @@ public @interface Mapping {
 
         Class<?> targetType();
 
+    }
+
+    public static enum ValueStrategy {
+        DEFAULT,
+        IF_NOT_NULL,
+        IF_NOT_EMPTY;
     }
 
 }

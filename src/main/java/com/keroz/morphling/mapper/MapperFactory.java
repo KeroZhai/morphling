@@ -10,11 +10,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
-import com.keroz.morphling.annotation.MapperIgnore;
-import com.keroz.morphling.annotation.MapperIgnore.Excluded;
-import com.keroz.morphling.annotation.MapperIgnore.Included;
-import com.keroz.morphling.annotation.MapperIgnore.Policy;
 import com.keroz.morphling.annotation.Mapping;
+import com.keroz.morphling.annotation.MappingIgnore;
 import com.keroz.morphling.codegenerator.ArrayTypeConversionCodeGenerator;
 import com.keroz.morphling.codegenerator.CollectionTypeConversionCodeGenerator;
 import com.keroz.morphling.codegenerator.ConversionCodeGenerator;
@@ -108,7 +105,8 @@ public final class MapperFactory {
 
             String sourceClassName = sourceClass.getName();
             String targetClassName = targetClass.getName();
-            CtMethod instantiateMethod = new CtMethod(objectCtClass, "instantiate", new CtClass[] { objectCtClass }, mapperCtClass);
+            CtMethod instantiateMethod = new CtMethod(objectCtClass, "instantiate", new CtClass[] { objectCtClass },
+                    mapperCtClass);
             instantiateMethod.setModifiers(Modifier.PUBLIC);
             instantiateMethod.setBody(generateInstantiateMethodBody(sourceClass, targetClass));
             mapperCtClass.addMethod(instantiateMethod);
@@ -125,6 +123,12 @@ public final class MapperFactory {
                 String targetFieldName = targetField.getName();
                 String sourceFieldName = targetFieldName;
                 AnnotatedType targetFieldType = targetField.getAnnotatedType();
+
+                MappingIgnore mappingIgnore = targetField.getAnnotation(MappingIgnore.class);
+
+                if (mappingIgnore != null) {
+                    continue;
+                }
 
                 Mapping mapping = targetField.getAnnotation(Mapping.class);
 
@@ -150,10 +154,6 @@ public final class MapperFactory {
                     String sourceFieldNonGenericTypeName = getNonGenericTypeName(sourceFieldType.getType());
                     String targetFieldNonGenericTypeName = getNonGenericTypeName(targetFieldType.getType());
 
-                    MapperIgnore mapperIgnoreAnnotation = targetField.getAnnotation(MapperIgnore.class);
-                    Class<?>[] groups = null;
-                    Policy ignorePolicy = null;
-                    boolean hasGroups = false;
                     GenerationContext generationContext = GenerationContext.builder()
                             .sourceType(sourceFieldType)
                             .targetType(targetFieldType)
@@ -161,48 +161,59 @@ public final class MapperFactory {
                             .mapping(mapping)
                             .build();
 
-                    if (mapperIgnoreAnnotation != null) {
-                        ignorePolicy = mapperIgnoreAnnotation.policy();
-                        groups = mapperIgnoreAnnotation.groups();
-                        hasGroups = groups.length > 0;
+                    if (mapping != null) {
+                        Mapping.ValueStrategy strategy = mapping.valueStrategy();
+                        boolean shouldIgnore = false;
+                        Class<?>[] groupsToMatch = null;
 
-                        if (!hasGroups && ignorePolicy == Policy.DEFAULT) {
-                            continue;
-                        } else {
-                            bodyBuilder.append("{boolean shouldIgnore = false;");
+                        if (mapping.when().length > 0) {
+                            shouldIgnore = true;
+                            groupsToMatch = mapping.when();
+                        } else if (mapping.unless().length > 0) {
+                            groupsToMatch = mapping.unless();
+                        }
 
-                            if (hasGroups) {
-                                Class<?> lastGroup = groups[groups.length - 1];
+                        if (strategy != Mapping.ValueStrategy.DEFAULT || groupsToMatch != null) {
+                            bodyBuilder.append("{ boolean shouldIgnore = ").append(shouldIgnore).append(";");
 
+                            if (groupsToMatch != null) {
                                 bodyBuilder.append("if (ignoreGroups != null && ignoreGroups.length > 0) {")
-                                        .append("for (int i = 0; i < ignoreGroups.length; i++) {")
-                                        .append("if (ignoreGroups[i] == ").append(lastGroup.getName())
-                                        .append(".class) { ")
-                                        .append("shouldIgnore = ").append(Excluded.class.isAssignableFrom(lastGroup))
-                                        .append("; break; }}} else { shouldIgnore = ")
-                                        .append(Included.class.isAssignableFrom(lastGroup)).append("; }");
+                                        .append("for (int i = 0; i < ignoreGroups.length; i++) {");
+
+                                for (Class<?> group : groupsToMatch) {
+                                    bodyBuilder.append("if (ignoreGroups[i] == ").append(group.getName())
+                                            .append(".class) { shouldIgnore = !shouldIgnore; break; }");
+                                }
+
+                                bodyBuilder.append("}}");
                             }
 
-                            bodyBuilder.append(sourceFieldNonGenericTypeName).append(" ").append(generationContext.getSourceVariableName()).append(" = ")
+                            bodyBuilder.append(sourceFieldNonGenericTypeName).append(" ")
+                                    .append(generationContext.getSourceVariableName()).append(" = ")
                                     .append(sourceValue).append(";");
-                            switch (ignorePolicy) {
-                                case IGNORE_NULL: {
-                                    bodyBuilder.append("shouldIgnore = shouldIgnore || ").append(generationContext.getSourceVariableName()).append(" == null;");
+
+                            switch (strategy) {
+                                case IF_NOT_NULL: {
+                                    bodyBuilder.append("shouldIgnore = shouldIgnore || ")
+                                            .append(generationContext.getSourceVariableName()).append(" == null;");
                                     break;
                                 }
-                                case IGNORE_EMPTY: {
-                                    bodyBuilder.append("shouldIgnore = shouldIgnore || ReflectionUtils.isEmpty(").append(generationContext.getSourceVariableName()).append(");");
+                                case IF_NOT_EMPTY: {
+                                    bodyBuilder.append("shouldIgnore = shouldIgnore || ReflectionUtils.isEmpty(")
+                                            .append(generationContext.getSourceVariableName()).append(");");
                                     break;
                                 }
                                 default: {
                                     break;
                                 }
                             }
+
                             bodyBuilder.append("if (!shouldIgnore) {");
                         }
                     } else {
                         // Double curly braces to match cases with and without MapperIgnore annotation
-                        bodyBuilder.append("{{").append(sourceFieldNonGenericTypeName).append(" ").append(generationContext.getSourceVariableName()).append(" = ")
+                        bodyBuilder.append("{{").append(sourceFieldNonGenericTypeName).append(" ")
+                                .append(generationContext.getSourceVariableName()).append(" = ")
                                 .append(sourceValue).append(";");
                     }
 
@@ -331,7 +342,8 @@ public final class MapperFactory {
             if (targetClass.isAssignableFrom(sourceClass)) {
                 bodyBuilder.append("return $1.getClass().newInstance();");
             } else {
-                bodyBuilder.append("throw new InstantiationException(\"Cannot instantiate interface or abstract class\");");
+                bodyBuilder.append(
+                        "throw new InstantiationException(\"Cannot instantiate interface or abstract class\");");
             }
         } else {
             bodyBuilder.append("return new ").append(targetClass.getName()).append("();");
@@ -342,7 +354,5 @@ public final class MapperFactory {
 
         return bodyBuilder.toString();
     }
-
-
 
 }
