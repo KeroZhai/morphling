@@ -7,11 +7,19 @@ public abstract class GeneratedMapper implements Mapper<Object, Object> {
     public abstract Object instantiate(Object source);
 
     public Object map(Object source, Class<?>[] ignoreGroups, Context context) {
-        Object target = context.get(source);
+        Object target = null;
+
+        if (source != null) {
+            target = context.get(source);
+        }
 
         if (target == null) {
             target = instantiate(source);
-            context.put(source, target);
+
+            if (source != null) {
+                context.put(source, target);
+            }
+
             map(source, target, ignoreGroups, context);
         }
 
