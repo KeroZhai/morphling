@@ -32,7 +32,7 @@ import javassist.CtField;
 import javassist.CtMethod;
 
 /**
- * 123
+ * MapperFactory is responsible for generating and caching Mappers.
  */
 public final class MapperFactory {
 
@@ -153,6 +153,7 @@ public final class MapperFactory {
                     String sourceValue = "source." + getterName + "()";
                     String sourceFieldNonGenericTypeName = getNonGenericTypeName(sourceFieldType.getType());
                     String targetFieldNonGenericTypeName = getNonGenericTypeName(targetFieldType.getType());
+                    boolean shouldCheckIgnore = false;
 
                     GenerationContext generationContext = GenerationContext.builder()
                             .sourceType(sourceFieldType)
@@ -174,6 +175,7 @@ public final class MapperFactory {
                         }
 
                         if (strategy != Mapping.ValueStrategy.DEFAULT || groupsToMatch != null) {
+                            shouldCheckIgnore = true;
                             bodyBuilder.append("{ boolean shouldIgnore = ").append(shouldIgnore).append(";");
 
                             if (groupsToMatch != null) {
@@ -210,7 +212,9 @@ public final class MapperFactory {
 
                             bodyBuilder.append("if (!shouldIgnore) {");
                         }
-                    } else {
+                    }
+
+                    if (!shouldCheckIgnore) {
                         // Double curly braces to match cases with and without MapperIgnore annotation
                         bodyBuilder.append("{{").append(sourceFieldNonGenericTypeName).append(" ")
                                 .append(generationContext.getSourceVariableName()).append(" = ")
