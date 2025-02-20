@@ -6,9 +6,9 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.keroz.morphling.annotation.Mapping;
 import com.keroz.morphling.annotation.MappingIgnore;
@@ -42,12 +42,12 @@ public final class MapperFactory {
             "com.keroz.morphling.mapper.GeneratedMapper");
     private CtClass objectCtClass = JavassistUtils.getCtClass(POOL, "java.lang.Object");
     private List<ConversionCodeGenerator> conversionCodeGenerators = new ArrayList<>();
-    private HashMap<Class<?>, ObjectFactory<?>> fallbackObjecFactories = new HashMap<>();
+    private ConcurrentHashMap<Class<?>, ObjectFactory<?>> fallbackObjecFactories = new ConcurrentHashMap<>();
 
     @SuppressWarnings("rawtypes")
-    private HashMap<MapperKey, Mapper> generatedMapperMap = new HashMap<>();
+    private ConcurrentHashMap<MapperKey, Mapper> generatedMapperMap = new ConcurrentHashMap<>();
     @SuppressWarnings("rawtypes")
-    private HashMap<String, Converter> converterMap = new HashMap<>();
+    private ConcurrentHashMap<String, Converter> converterMap = new ConcurrentHashMap<>();
 
     public MapperFactory() {
         POOL.importPackage("com.keroz.morphling.mapper");
@@ -281,7 +281,6 @@ public final class MapperFactory {
             }
 
             String body = bodyBuilder.append("}").toString();
-            System.out.println(body);
             mapMethod.setBody(body);
             mapperCtClass.addMethod(mapMethod);
 
