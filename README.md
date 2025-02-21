@@ -2,14 +2,12 @@ This library is currently WIP.
 
 ## Features
 
-* [ ] Basic **deep** mapping(Based on field names).
-* [ ] Support array or `Collection`.
-* [ ] Ignore fields conditionally.
+* [x] Basic **deep** mapping(Based on field names).
+* [x] Support array or `Collection`.
+* [x] Map or ignore fields conditionally.
 * [ ] ...
 
-## API Usage Design:
-
-API usage might be like this:
+## API Usage
 
 ```java
 Source source = ...; // Get a source bean
