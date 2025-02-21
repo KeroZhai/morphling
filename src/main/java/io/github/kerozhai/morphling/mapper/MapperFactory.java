@@ -6,6 +6,7 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -235,7 +236,7 @@ public final class MapperFactory {
                                 } catch (InstantiationException | IllegalAccessException e) {
                                     e.printStackTrace();
                                 }
-                                }
+                            }
 
                             if (converter != null) {
                                 // use converter to convert value
@@ -338,8 +339,8 @@ public final class MapperFactory {
     }
 
     private String generateMapperClassNameFor(Class<?> sourceClass, Class<?> targetClass) {
-
-        return StringUtils.classNameToPascalCase(sourceClass.getName()) + "To"
+        return sourceClass.getPackage().getName() + "." + StringUtils.classNameToPascalCase(sourceClass.getName())
+                + "To"
                 + StringUtils.classNameToPascalCase(targetClass.getName()) + "Mapper$" + uniqueId;
     }
 
