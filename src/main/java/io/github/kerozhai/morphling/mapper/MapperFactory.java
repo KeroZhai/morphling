@@ -235,7 +235,9 @@ public final class MapperFactory {
                                 } catch (InstantiationException | IllegalAccessException e) {
                                     e.printStackTrace();
                                 }
+                                }
 
+                            if (converter != null) {
                                 // use converter to convert value
                                 bodyBuilder.append(setter).append("((").append(targetFieldNonGenericTypeName)
                                         .append(") mapperFactory.getConverter(\"")
@@ -253,9 +255,9 @@ public final class MapperFactory {
                                 }
 
                                 bodyBuilder.append("}}");
-
-                                continue;
                             }
+
+                            continue;
                         }
                     }
 
