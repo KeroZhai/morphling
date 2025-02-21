@@ -304,6 +304,20 @@ public final class MapperFactory {
         conversionCodeGenerators.add(generator);
     }
 
+    public void addConverter(Converter<?, ?> converter) {
+        converterMap.put(converter.getClass().getName(), converter);
+    }
+
+    public void addConverters(Converter<?, ?>... converters) {
+        for (Converter<?, ?> converter : converters) {
+            addConverter(converter);
+        }
+    }
+
+    public void addConverters(Collection<Converter<?, ?>> converters) {
+        converters.forEach(this::addConverter);
+    }
+
     public Converter<?, ?> getConverter(String converterClassName) {
         return converterMap.get(converterClassName);
     }
