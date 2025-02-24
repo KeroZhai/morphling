@@ -4,7 +4,16 @@ import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import io.github.kerozhai.morphling.annotation.Mapping.ValueStrategy;
+import lombok.Getter;
+
 public class Context {
+
+    @Getter
+    private Class<?>[] ignoreGroups;
+
+    @Getter
+    private ValueStrategy valueStrategy;
 
     private Map<Object, Object> cache = new IdentityHashMap<>();
 
@@ -16,7 +25,14 @@ public class Context {
         return cache.get(source);
     }
 
+    public void init(Class<?>[] ignoreGroups, ValueStrategy valueStrategy) {
+        this.ignoreGroups = ignoreGroups;
+        this.valueStrategy = valueStrategy;
+    }
+
     public void reset() {
+        this.ignoreGroups = null;
+        this.valueStrategy = null;
         cache.clear();
     }
 
@@ -28,9 +44,11 @@ public class Context {
 
         public Context getContext() {
             Context context = contextQueue.poll();
+
             if (context == null) {
                 context = new Context();
             }
+
             return context;
         }
 

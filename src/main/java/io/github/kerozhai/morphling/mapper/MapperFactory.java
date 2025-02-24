@@ -88,7 +88,6 @@ public final class MapperFactory {
     }
 
     public Class<?> generateMapperClassFor(Class<?> sourceClass, Class<?> targetClass) {
-        CtClass groupsCtClass = JavassistUtils.getCtClass(POOL, Class[].class.getName());
         CtClass contextCtClass = JavassistUtils.getCtClass(POOL, Context.class.getName());
 
         try {
@@ -112,12 +111,12 @@ public final class MapperFactory {
             mapperCtClass.addMethod(instantiateMethod);
 
             CtMethod mapMethod = new CtMethod(CtClass.voidType, "map",
-                    new CtClass[] { objectCtClass, objectCtClass, groupsCtClass, contextCtClass }, mapperCtClass);
+                    new CtClass[] { objectCtClass, objectCtClass, contextCtClass }, mapperCtClass);
             mapMethod.setModifiers(Modifier.PUBLIC);
             bodyBuilder.append(sourceClassName).append(" source = ").append("(").append(sourceClassName).append(") $1;")
                     .append(targetClassName)
                     .append(" target = ").append("(").append(targetClassName)
-                    .append(") $2; Class[] ignoreGroups = $3; Context context = $4;");
+                    .append(") $2; Context context = $3;");
 
             for (Field targetField : ReflectionUtils.getDeclaredAndInheritedFields(targetClass)) {
                 String targetFieldName = targetField.getName();
@@ -153,7 +152,6 @@ public final class MapperFactory {
                     String sourceValue = "source." + getterName + "()";
                     String sourceFieldNonGenericTypeName = getNonGenericTypeName(sourceFieldType.getType());
                     String targetFieldNonGenericTypeName = getNonGenericTypeName(targetFieldType.getType());
-                    boolean shouldCheckIgnore = false;
 
                     GenerationContext generationContext = GenerationContext.builder()
                             .sourceType(sourceFieldType)
@@ -162,8 +160,12 @@ public final class MapperFactory {
                             .mapping(mapping)
                             .build();
 
+                    bodyBuilder.append("{ boolean shouldIgnore = ");
+
+                    Mapping.ValueStrategy localValueStrategy = null;
+
                     if (mapping != null) {
-                        Mapping.ValueStrategy strategy = mapping.valueStrategy();
+                        localValueStrategy = mapping.valueStrategy();
                         boolean shouldIgnore = false;
                         Class<?>[] groupsToMatch = null;
 
@@ -174,52 +176,77 @@ public final class MapperFactory {
                             groupsToMatch = mapping.unless();
                         }
 
-                        if (strategy != Mapping.ValueStrategy.DEFAULT || groupsToMatch != null) {
-                            shouldCheckIgnore = true;
-                            bodyBuilder.append("{ boolean shouldIgnore = ").append(shouldIgnore).append(";");
+                        if (groupsToMatch != null) {
+                            bodyBuilder.append(shouldIgnore).append(";");
 
                             if (groupsToMatch != null) {
-                                bodyBuilder.append("if (ignoreGroups != null && ignoreGroups.length > 0) {")
-                                        .append("for (int i = 0; i < ignoreGroups.length; i++) {");
+                                bodyBuilder.append(
+                                        "if (context.getIgnoreGroups() != null && context.getIgnoreGroups().length > 0) {")
+                                        .append("for (int i = 0; i < context.getIgnoreGroups().length; i++) {");
 
                                 for (Class<?> group : groupsToMatch) {
-                                    bodyBuilder.append("if (ignoreGroups[i] == ").append(group.getName())
+                                    bodyBuilder.append("if (context.getIgnoreGroups()[i] == ").append(group.getName())
                                             .append(".class) { shouldIgnore = !shouldIgnore; break; }");
                                 }
 
                                 bodyBuilder.append("}}");
                             }
-
-                            bodyBuilder.append(sourceFieldNonGenericTypeName).append(" ")
-                                    .append(generationContext.getSourceVariableName()).append(" = ")
-                                    .append(sourceValue).append(";");
-
-                            switch (strategy) {
-                                case IF_NOT_NULL: {
-                                    bodyBuilder.append("shouldIgnore = shouldIgnore || ")
-                                            .append(generationContext.getSourceVariableName()).append(" == null;");
-                                    break;
-                                }
-                                case IF_NOT_EMPTY: {
-                                    bodyBuilder.append("shouldIgnore = shouldIgnore || ReflectionUtils.isEmpty(")
-                                            .append(generationContext.getSourceVariableName()).append(");");
-                                    break;
-                                }
-                                default: {
-                                    break;
-                                }
-                            }
-
-                            bodyBuilder.append("if (!shouldIgnore) {");
+                        } else {
+                            bodyBuilder.append("false;");
                         }
+                    } else {
+                        bodyBuilder.append("false;");
                     }
 
-                    if (!shouldCheckIgnore) {
-                        // Double curly braces to match cases with and without MapperIgnore annotation
-                        bodyBuilder.append("{{").append(sourceFieldNonGenericTypeName).append(" ")
-                                .append(generationContext.getSourceVariableName()).append(" = ")
-                                .append(sourceValue).append(";");
+                    bodyBuilder.append(sourceFieldNonGenericTypeName).append(" ")
+                            .append(generationContext.getSourceVariableName()).append(" = ")
+                            .append(sourceValue).append(";");
+
+                    if (localValueStrategy != null && localValueStrategy != Mapping.ValueStrategy.DEFAULT) {
+                        switch (localValueStrategy) {
+                            case IF_NOT_NULL: {
+                                bodyBuilder.append("shouldIgnore = shouldIgnore || ")
+                                        .append(generationContext.getSourceVariableName()).append(" == null;");
+                                break;
+                            }
+                            case IF_NOT_EMPTY: {
+                                bodyBuilder.append("shouldIgnore = shouldIgnore || ReflectionUtils.isEmpty(")
+                                        .append(generationContext.getSourceVariableName()).append(");");
+                                break;
+                            }
+                            default: {
+                                break;
+                            }
+                        }
+                    } else {
+                        boolean isSourceTypePrimitive = ReflectionUtils.isPrimitiveType(sourceFieldType.getType());
+
+                        bodyBuilder.append("if (context.getValueStrategy() != null) {")
+                                .append("switch (context.getValueStrategy().name()) {")
+                                .append("case \"IF_NOT_NULL\": { shouldIgnore = shouldIgnore || ");
+
+                        if (isSourceTypePrimitive) {
+                            bodyBuilder.append("false;");
+                        } else {
+                            bodyBuilder.append(generationContext.getSourceVariableName()).append(" == null;");
+                        }
+
+                        bodyBuilder.append("break; }")
+                                .append("case \"IF_NOT_EMPTY\": { shouldIgnore = shouldIgnore || ReflectionUtils.isEmpty(");
+
+                        if (isSourceTypePrimitive) {
+                            bodyBuilder.append(ReflectionUtils.toWrapper(sourceFieldType.getType()).getName())
+                                    .append(".valueOf(")
+                                    .append(sourceValue).append("));");
+                        } else {
+                            bodyBuilder.append(generationContext.getSourceVariableName()).append(");");
+                        }
+                        bodyBuilder.append("break; }")
+                                .append("default: break;")
+                                .append("}}");
                     }
+
+                    bodyBuilder.append("if (!shouldIgnore) {");
 
                     // check if converter specified
                     if (mapping != null) {

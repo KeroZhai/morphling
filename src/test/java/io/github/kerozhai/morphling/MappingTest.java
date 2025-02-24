@@ -43,7 +43,8 @@ public class MappingTest {
         assertEquals(source.getA(), target.getB());
     }
 
-    public static class TimestampToDateConverter implements io.github.kerozhai.morphling.converter.Converter<Long, Date> {
+    public static class TimestampToDateConverter
+            implements io.github.kerozhai.morphling.converter.Converter<Long, Date> {
 
         @Override
         public Date convert(Long source, MapperFactory mapperFactory) {
@@ -233,4 +234,38 @@ public class MappingTest {
         assertNull(departmentDto.getChildren());
     }
 
+    @Data
+    public static class Foo {
+
+        private String nullValue;
+
+        private String emptyValue = "";
+
+    }
+
+    @Data
+    public static class Bar {
+
+        @Mapping(alias = "nullValue")
+        private String notNullValue = "notNullValue";
+
+        @Mapping(alias = "emptyValue")
+        private String notEmptyValue = "notEmptyValue";
+
+    }
+
+    @Test
+    public void testMethodLevelValueStrategy() {
+        Foo foo = new Foo();
+        Mapper<Foo, Bar> mapper = mapperFactory.getMapperFor(Foo.class, Bar.class);
+        Bar bar = mapper.map(foo, ValueStrategy.IF_NOT_NULL);
+
+        assertEquals("notNullValue", bar.getNotNullValue());
+        assertEquals("", bar.getNotEmptyValue());
+
+        bar = mapper.map(foo, ValueStrategy.IF_NOT_EMPTY);
+
+        assertEquals("notNullValue", bar.getNotNullValue());
+        assertEquals("notEmptyValue", bar.getNotEmptyValue());
+    }
 }

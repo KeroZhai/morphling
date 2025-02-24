@@ -1,12 +1,14 @@
 package io.github.kerozhai.morphling.mapper;
 
+import io.github.kerozhai.morphling.annotation.Mapping.ValueStrategy;
+
 public abstract class GeneratedMapper implements Mapper<Object, Object> {
 
-    public abstract void map(Object source, Object target, Class<?>[] ignoreGroups, Context context);
+    public abstract void map(Object source, Object target, Context context);
 
     public abstract Object instantiate(Object source);
 
-    public Object map(Object source, Class<?>[] ignoreGroups, Context context) {
+    public Object map(Object source, Context context) {
         Object target = null;
 
         if (source != null) {
@@ -20,17 +22,19 @@ public abstract class GeneratedMapper implements Mapper<Object, Object> {
                 context.put(source, target);
             }
 
-            map(source, target, ignoreGroups, context);
+            map(source, target, context);
         }
 
         return target;
     }
 
     @Override
-    public Object map(Object source, Class<?>... ignoreGroups) {
+    public Object map(Object source, ValueStrategy valueStrategy, Class<?>... ignoreGroups) {
         Context context = Context.Factory.INSTANCE.getContext();
 
-        Object target = map(source, ignoreGroups, context);
+        context.init(ignoreGroups, valueStrategy);
+
+        Object target = map(source, context);
 
         Context.Factory.INSTANCE.release(context);
 
@@ -38,10 +42,23 @@ public abstract class GeneratedMapper implements Mapper<Object, Object> {
     }
 
     @Override
-    public void map(Object source, Object target, Class<?>... ignoreGroups) {
+    public void map(Object source, Object target, ValueStrategy valueStrategy, Class<?>... ignoreGroups) {
         Context context = Context.Factory.INSTANCE.getContext();
-        map(source, target, ignoreGroups, context);
+        context.init(ignoreGroups, valueStrategy);
+
+        map(source, target, context);
+
         Context.Factory.INSTANCE.release(context);
+    }
+
+    @Override
+    public Object map(Object source, Class<?>... ignoreGroups) {
+        return map(source, ValueStrategy.DEFAULT, ignoreGroups);
+    }
+
+    @Override
+    public void map(Object source, Object target, Class<?>... ignoreGroups) {
+        map(source, target, ValueStrategy.DEFAULT, ignoreGroups);
     }
 
     @Override

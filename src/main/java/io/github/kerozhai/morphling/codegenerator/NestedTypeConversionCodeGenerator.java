@@ -41,7 +41,7 @@ public class NestedTypeConversionCodeGenerator implements ConversionCodeGenerato
                 .append(context.addSuffix("initialValueType"))
                 .append(".newInstance();")
                 .append(context.addSuffix("mapper")).append(".map(").append(context.getSourceVariableName())
-                .append(", ").append(context.getTargetVariableName()).append(", ignoreGroups, context);}")
+                .append(", ").append(context.getTargetVariableName()).append(", context);}")
                 .append("else {")
                 .append("GeneratedMapper " + context.addSuffix("mapper")
                         + " = (GeneratedMapper) mapperFactory.getMapperFor("
@@ -49,7 +49,7 @@ public class NestedTypeConversionCodeGenerator implements ConversionCodeGenerato
                         + targetTypeName + ".class);\n")
                 .append(context.getTargetVariableName() + " = (" + targetTypeName
                         + ") " + context.addSuffix("mapper") + ".map(" + context.getSourceVariableName()
-                        + ", ignoreGroups, context);}");
+                        + ", context);}");
 
         return builder.toString();
     }

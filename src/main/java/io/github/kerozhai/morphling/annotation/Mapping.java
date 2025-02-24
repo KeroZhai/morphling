@@ -64,9 +64,10 @@ public @interface Mapping {
     }
 
     public static enum ValueStrategy {
-        DEFAULT,
+        ANY,
         IF_NOT_NULL,
-        IF_NOT_EMPTY;
+        IF_NOT_EMPTY,
+        DEFAULT;
     }
 
 }
