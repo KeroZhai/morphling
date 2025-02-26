@@ -4,9 +4,22 @@ import io.github.kerozhai.morphling.annotation.Mapping.ValueStrategy;
 
 public abstract class GeneratedMapper implements Mapper<Object, Object> {
 
-    public abstract void map(Object source, Object target, Context context);
+    public abstract void doMap(Object source, Object target, Context context);
 
     public abstract Object instantiate(Object source);
+
+    public void map(Object source, Object target, Context context) {
+        if (source != null) {
+            if (context.get(source) == target) {
+                // already mapped
+                return;
+            }
+
+            context.put(source, target);
+        }
+
+        doMap(source, target, context);
+    }
 
     public Object map(Object source, Context context) {
         Object target = null;
@@ -17,11 +30,6 @@ public abstract class GeneratedMapper implements Mapper<Object, Object> {
 
         if (target == null) {
             target = instantiate(source);
-
-            if (source != null) {
-                context.put(source, target);
-            }
-
             map(source, target, context);
         }
 

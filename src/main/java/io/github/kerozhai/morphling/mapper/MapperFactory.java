@@ -110,7 +110,7 @@ public final class MapperFactory {
             instantiateMethod.setBody(generateInstantiateMethodBody(sourceClass, targetClass));
             mapperCtClass.addMethod(instantiateMethod);
 
-            CtMethod mapMethod = new CtMethod(CtClass.voidType, "map",
+            CtMethod mapMethod = new CtMethod(CtClass.voidType, "doMap",
                     new CtClass[] { objectCtClass, objectCtClass, contextCtClass }, mapperCtClass);
             mapMethod.setModifiers(Modifier.PUBLIC);
             bodyBuilder.append(sourceClassName).append(" source = ").append("(").append(sourceClassName).append(") $1;")
