@@ -2,6 +2,7 @@ package io.github.kerozhai.morphling.mapper;
 
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -28,8 +29,8 @@ import io.github.kerozhai.morphling.util.StringUtils;
 import javassist.CannotCompileException;
 import javassist.ClassPool;
 import javassist.CtClass;
-import javassist.CtField;
 import javassist.CtMethod;
+import javassist.CtNewConstructor;
 
 /**
  * MapperFactory is responsible for generating and caching Mappers.
@@ -41,6 +42,7 @@ public final class MapperFactory {
     private CtClass abstractMapperCtClass = JavassistUtils.getCtClass(POOL,
             "io.github.kerozhai.morphling.mapper.GeneratedMapper");
     private CtClass objectCtClass = JavassistUtils.getCtClass(POOL, "java.lang.Object");
+    private CtClass mapperFactoryCtClass = JavassistUtils.getCtClass(POOL, getClass().getName());
     private List<ConversionCodeGenerator> conversionCodeGenerators = new ArrayList<>();
     private ConcurrentHashMap<Class<?>, ObjectFactory<?>> fallbackObjecFactories = new ConcurrentHashMap<>();
 
@@ -75,11 +77,11 @@ public final class MapperFactory {
 
         if (mapper == null) {
             try {
-                mapper = (Mapper<Source, Target>) generateMapperClassFor(sourceClass, targetClass).newInstance();
-                mapper.getClass().getDeclaredField("mapperFactory").set(mapper, this);
+                mapper = (Mapper<Source, Target>) generateMapperClassFor(sourceClass, targetClass)
+                        .getConstructor(MapperFactory.class).newInstance(this);
                 generatedMapperMap.put(mapperKey, mapper);
-            } catch (InstantiationException | IllegalAccessException | IllegalArgumentException | NoSuchFieldException
-                    | SecurityException e) {
+            } catch (InstantiationException | IllegalAccessException | IllegalArgumentException | SecurityException
+                    | InvocationTargetException | NoSuchMethodException e) {
                 e.printStackTrace();
             }
         }
@@ -92,11 +94,8 @@ public final class MapperFactory {
 
         try {
             CtClass mapperCtClass = POOL.makeClass(generateMapperClassNameFor(sourceClass, targetClass));
-            CtField mapperFactoryField = new CtField(JavassistUtils.getCtClass(POOL, getClass().getName()),
-                    "mapperFactory", mapperCtClass);
-
-            mapperFactoryField.setModifiers(Modifier.PUBLIC);
-            mapperCtClass.addField(mapperFactoryField);
+            mapperCtClass
+                    .addConstructor(CtNewConstructor.make(new CtClass[] { mapperFactoryCtClass }, null, mapperCtClass));
 
             StringBuilder bodyBuilder = new StringBuilder("{\n");
 
@@ -106,13 +105,13 @@ public final class MapperFactory {
             String targetClassName = targetClass.getName();
             CtMethod instantiateMethod = new CtMethod(objectCtClass, "instantiate", new CtClass[] { objectCtClass },
                     mapperCtClass);
-            instantiateMethod.setModifiers(Modifier.PUBLIC);
+            instantiateMethod.setModifiers(Modifier.PROTECTED);
             instantiateMethod.setBody(generateInstantiateMethodBody(sourceClass, targetClass));
             mapperCtClass.addMethod(instantiateMethod);
 
             CtMethod mapMethod = new CtMethod(CtClass.voidType, "doMap",
                     new CtClass[] { objectCtClass, objectCtClass, contextCtClass }, mapperCtClass);
-            mapMethod.setModifiers(Modifier.PUBLIC);
+            mapMethod.setModifiers(Modifier.PROTECTED);
             bodyBuilder.append(sourceClassName).append(" source = ").append("(").append(sourceClassName).append(") $1;")
                     .append(targetClassName)
                     .append(" target = ").append("(").append(targetClassName)
@@ -146,8 +145,12 @@ public final class MapperFactory {
                     AnnotatedType sourceFieldType = sourceField.getAnnotatedType();
                     String capitalizedSourceFieldName = StringUtils.capitalize(sourceFieldName);
                     String capitalizedTargetFieldName = StringUtils.capitalize(targetFieldName);
-                    String sourceGetter = "source." + ("boolean".equals(sourceFieldType.getType().getTypeName()) ? "is" : "get") + capitalizedSourceFieldName + "()";
-                    String targetGetter = "target." + ("boolean".equals(targetFieldType.getType().getTypeName()) ? "is" : "get") + capitalizedTargetFieldName + "()";
+                    String sourceGetter = "source."
+                            + ("boolean".equals(sourceFieldType.getType().getTypeName()) ? "is" : "get")
+                            + capitalizedSourceFieldName + "()";
+                    String targetGetter = "target."
+                            + ("boolean".equals(targetFieldType.getType().getTypeName()) ? "is" : "get")
+                            + capitalizedTargetFieldName + "()";
                     String targetSetter = "target.set" + capitalizedTargetFieldName;
                     String sourceFieldNonGenericTypeName = getNonGenericTypeName(sourceFieldType.getType());
                     String targetFieldNonGenericTypeName = getNonGenericTypeName(targetFieldType.getType());
@@ -296,7 +299,8 @@ public final class MapperFactory {
                                 bodyBuilder.append(targetFieldNonGenericTypeName)
                                         .append(" ").append(generationContext.getTargetVariableName())
                                         .append(" =").append(targetGetter).append(";").append(code)
-                                        .append(targetSetter).append("(").append(generationContext.getTargetVariableName())
+                                        .append(targetSetter).append("(")
+                                        .append(generationContext.getTargetVariableName())
                                         .append(");\n");
                             }
 

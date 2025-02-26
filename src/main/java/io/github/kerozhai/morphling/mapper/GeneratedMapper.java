@@ -4,9 +4,11 @@ import io.github.kerozhai.morphling.annotation.Mapping.ValueStrategy;
 
 public abstract class GeneratedMapper implements Mapper<Object, Object> {
 
-    public abstract void doMap(Object source, Object target, Context context);
+    protected final MapperFactory mapperFactory;
 
-    public abstract Object instantiate(Object source);
+    public GeneratedMapper(MapperFactory mapperFactory) {
+        this.mapperFactory = mapperFactory;
+    }
 
     public void map(Object source, Object target, Context context) {
         if (source != null) {
@@ -78,5 +80,9 @@ public abstract class GeneratedMapper implements Mapper<Object, Object> {
     public void map(Object source, Object target) {
         map(source, target, (Class<?>[]) null);
     }
+
+    protected abstract void doMap(Object source, Object target, Context context);
+
+    protected abstract Object instantiate(Object source);
 
 }
