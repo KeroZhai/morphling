@@ -47,9 +47,13 @@ public class NestedTypeConversionCodeGenerator implements ConversionCodeGenerato
                         + " = (GeneratedMapper) mapperFactory.getMapperFor("
                         + sourceTypeName + ".class, "
                         + targetTypeName + ".class);\n")
+                .append("if (").append(context.getTargetVariableName()).append(" == null) {")
                 .append(context.getTargetVariableName() + " = (" + targetTypeName
                         + ") " + context.addSuffix("mapper") + ".map(" + context.getSourceVariableName()
-                        + ", context);}");
+                        + ", context);} else  { ")
+                .append(context.addSuffix("mapper")).append(".map(").append(context.getSourceVariableName())
+                .append(", ").append(context.getTargetVariableName()).append(", context);}")
+                .append("}");
 
         return builder.toString();
     }

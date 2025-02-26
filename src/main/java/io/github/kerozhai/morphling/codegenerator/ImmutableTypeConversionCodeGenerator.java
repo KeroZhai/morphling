@@ -35,7 +35,7 @@ public class ImmutableTypeConversionCodeGenerator implements ConversionCodeGener
                 return "if (" + context.getSourceVariableName() + " != null) {" + context.getTargetVariableName()
                         + " = " + context.getSourceVariableName() + "."
                         + targetType.getTypeName() + "Value();} else { " + context.getTargetVariableName() + " = "
-                        + getDefaultValueForPrimitiveType(targetType) + "; }";
+                        + ReflectionUtils.getDefaultValueStringForPrimitiveType(targetType) + "; }";
             } else {
                 throw new TypeMismatchException("");
             }
@@ -44,25 +44,5 @@ public class ImmutableTypeConversionCodeGenerator implements ConversionCodeGener
         }
     }
 
-    private String getDefaultValueForPrimitiveType(Type type) {
-        if (type == Boolean.TYPE)
-            return "false";
-        if (type == Byte.TYPE)
-            return "0";
-        if (type == Short.TYPE)
-            return "0";
-        if (type == Integer.TYPE)
-            return "0";
-        if (type == Long.TYPE)
-            return "0";
-        if (type == Character.TYPE)
-            return "''";
-        if (type == Float.TYPE)
-            return "0.0";
-        if (type == Double.TYPE)
-            return "0.0";
-
-        return "null";
-    }
 
 }

@@ -22,7 +22,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -242,5 +241,26 @@ public class ReflectionUtils {
         }
 
         return null;
+    }
+
+    public String getDefaultValueStringForPrimitiveType(Type type) {
+        if (type == Boolean.TYPE)
+            return "false";
+        if (type == Byte.TYPE)
+            return "0";
+        if (type == Short.TYPE)
+            return "0";
+        if (type == Integer.TYPE)
+            return "0";
+        if (type == Long.TYPE)
+            return "0";
+        if (type == Character.TYPE)
+            return "''";
+        if (type == Float.TYPE)
+            return "0.0";
+        if (type == Double.TYPE)
+            return "0.0";
+
+        return "null";
     }
 }

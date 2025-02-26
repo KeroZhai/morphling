@@ -144,12 +144,11 @@ public final class MapperFactory {
                 // Check if sourceClass has the field with the same name
                 if (sourceField != null) {
                     AnnotatedType sourceFieldType = sourceField.getAnnotatedType();
-                    String getterPrefix = "boolean".equals(sourceFieldType.getType().getTypeName()) ? "is" : "get";
                     String capitalizedSourceFieldName = StringUtils.capitalize(sourceFieldName);
                     String capitalizedTargetFieldName = StringUtils.capitalize(targetFieldName);
-                    String getterName = getterPrefix + capitalizedSourceFieldName;
-                    String setter = "target.set" + capitalizedTargetFieldName;
-                    String sourceValue = "source." + getterName + "()";
+                    String sourceGetter = "source." + ("boolean".equals(sourceFieldType.getType().getTypeName()) ? "is" : "get") + capitalizedSourceFieldName + "()";
+                    String targetGetter = "target." + ("boolean".equals(targetFieldType.getType().getTypeName()) ? "is" : "get") + capitalizedTargetFieldName + "()";
+                    String targetSetter = "target.set" + capitalizedTargetFieldName;
                     String sourceFieldNonGenericTypeName = getNonGenericTypeName(sourceFieldType.getType());
                     String targetFieldNonGenericTypeName = getNonGenericTypeName(targetFieldType.getType());
 
@@ -200,7 +199,7 @@ public final class MapperFactory {
 
                     bodyBuilder.append(sourceFieldNonGenericTypeName).append(" ")
                             .append(generationContext.getSourceVariableName()).append(" = ")
-                            .append(sourceValue).append(";");
+                            .append(sourceGetter).append(";");
 
                     if (localValueStrategy != null && localValueStrategy != Mapping.ValueStrategy.DEFAULT) {
                         switch (localValueStrategy) {
@@ -237,7 +236,7 @@ public final class MapperFactory {
                         if (isSourceTypePrimitive) {
                             bodyBuilder.append(ReflectionUtils.toWrapper(sourceFieldType.getType()).getName())
                                     .append(".valueOf(")
-                                    .append(sourceValue).append("));");
+                                    .append(sourceGetter).append("));");
                         } else {
                             bodyBuilder.append(generationContext.getSourceVariableName()).append(");");
                         }
@@ -267,7 +266,7 @@ public final class MapperFactory {
 
                             if (converter != null) {
                                 // use converter to convert value
-                                bodyBuilder.append(setter).append("((").append(targetFieldNonGenericTypeName)
+                                bodyBuilder.append(targetSetter).append("((").append(targetFieldNonGenericTypeName)
                                         .append(") mapperFactory.getConverter(\"")
                                         .append(className)
                                         .append("\").convert(");
@@ -277,9 +276,9 @@ public final class MapperFactory {
                                     bodyBuilder
                                             .append(ReflectionUtils.toWrapper(sourceFieldType.getType()).getName())
                                             .append(".valueOf(")
-                                            .append(sourceValue).append("), mapperFactory));");
+                                            .append(sourceGetter).append("), mapperFactory));");
                                 } else {
-                                    bodyBuilder.append(sourceValue).append(", mapperFactory));");
+                                    bodyBuilder.append(sourceGetter).append(", mapperFactory));");
                                 }
 
                                 bodyBuilder.append("}}");
@@ -296,8 +295,8 @@ public final class MapperFactory {
                             if (code != null) {
                                 bodyBuilder.append(targetFieldNonGenericTypeName)
                                         .append(" ").append(generationContext.getTargetVariableName())
-                                        .append(";").append(code)
-                                        .append(setter).append("(").append(generationContext.getTargetVariableName())
+                                        .append(" =").append(targetGetter).append(";").append(code)
+                                        .append(targetSetter).append("(").append(generationContext.getTargetVariableName())
                                         .append(");\n");
                             }
 

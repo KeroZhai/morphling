@@ -32,9 +32,7 @@ public class ArrayTypeConversionCodeGenerator implements ConversionCodeGenerator
         }
 
         GenerationContext subContext = context.getSubContext(sourceComponentType, targetComponentType);
-        builder.append(context.getTargetVariableName())
-                .append(" = null;") // important
-                .append("if (").append(context.getSourceVariableName()).append(" != null) {")
+        builder.append("if (").append(context.getSourceVariableName()).append(" != null) {")
                 .append("int ").append(context.addSuffix("length")).append(" = ")
                 .append(context.getSourceVariableName()).append(".length;")
                 .append(context.getTargetVariableName()).append(" = new ").append(simpleName).append("[")
@@ -46,7 +44,9 @@ public class ArrayTypeConversionCodeGenerator implements ConversionCodeGenerator
                 .append(subContext.getSourceVariableName()).append(" = ").append(context.getSourceVariableName())
                 .append("[").append(context.addSuffix("i")).append("];")
                 .append(ReflectionUtils.getSimpleTypeName(targetComponentType.getType())).append(" ")
-                .append(subContext.getTargetVariableName()).append(";");
+                .append(subContext.getTargetVariableName()).append(" = ")
+                .append(ReflectionUtils.getDefaultValueStringForPrimitiveType(targetComponentType.getType()))
+                .append(";");
 
         for (ConversionCodeGenerator generator : context.getGenerators()) {
             if (generator.isSupported(subContext)) {

@@ -26,8 +26,7 @@ public class CollectionTypeConversionCodeGenerator implements ConversionCodeGene
         AnnotatedType targetComponentType = targetParameterizedType.getAnnotatedActualTypeArguments()[0];
         StringBuilder builder = new StringBuilder();
 
-        builder.append(context.getTargetVariableName()).append(" = null;")
-                .append("if (").append(context.getSourceVariableName()).append(" != null) {")
+        builder.append("if (").append(context.getSourceVariableName()).append(" != null) {")
                 .append("Class ").append(context.addSuffix("sourceCollectionType")).append(" = ")
                 .append(context.getSourceVariableName()).append(".getClass();")
                 .append(context.defineInitialValueType());
