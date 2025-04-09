@@ -3,9 +3,11 @@
 
   <groupId>io.github.kerozhai</groupId>
   <artifactId>morphling</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>0.1.0</version>
 
   <name>Morphling</name>
+  <description>A simple yet highly efficient Java library for object mapping.</description>
+  <url>https://github.com/kerozhai/morphling</url>
 
   <properties>
     <maven.compiler.source>1.8</maven.compiler.source>
@@ -13,6 +15,26 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven-javadoc-plugin.version>3.0.0</maven-javadoc-plugin.version>
   </properties>
+
+  <scm>
+    <url>https://github.com/kerozhai/morphling</url>
+    <connection>scm:git:git://github.com/kerozhai/morphling.git</connection>
+    <developerConnection>scm:git:ssh://github.com/kerozhai/morphling.git</developerConnection>
+  </scm>
+
+  <developers>
+    <developer>
+      <name>Keroz</name>
+      <email>kerozhai@gmail.com</email>
+    </developer>
+  </developers>
+
+  <licenses>
+    <license>
+      <name>MIT License</name>
+      <url>http://www.opensource.org/licenses/mit-license.php</url>
+    </license>
+  </licenses>
 
   <dependencies>
     <dependency>
@@ -57,6 +79,10 @@
   <build>
     <plugins>
       <plugin>
+        <artifactId>maven-deploy-plugin</artifactId>
+        <version>3.1.3</version>
+      </plugin>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.8.1</version>
@@ -68,7 +94,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
-        <version>3.2.0</version>
+        <version>3.11.2</version>
         <configuration>
           <encoding>UTF-8</encoding>
           <aggregate>true</aggregate>
