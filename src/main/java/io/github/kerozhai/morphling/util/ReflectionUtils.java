@@ -6,6 +6,7 @@ import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.net.Inet4Address;
@@ -36,6 +37,12 @@ public class ReflectionUtils {
 
         while (declaringClass != Object.class) {
             for (Field field : declaringClass.getDeclaredFields()) {
+                int modifiers = field.getModifiers();
+
+                if (Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers)) {
+                    continue;
+                }
+
                 if (fieldNames.add(field.getName())) {
                     fields.add(field);
                 }
