@@ -11,13 +11,34 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 import io.github.kerozhai.morphling.annotation.Mapping;
+import io.github.kerozhai.morphling.codegenerator.ArrayTypeConversionCodeGenerator;
+import io.github.kerozhai.morphling.codegenerator.CollectionTypeConversionCodeGenerator;
+import io.github.kerozhai.morphling.codegenerator.ImmutableTypeConversionCodeGenerator;
+import io.github.kerozhai.morphling.codegenerator.NestedTypeConversionCodeGenerator;
+import io.github.kerozhai.morphling.codegenerator.OptionalTypeConversionCodeGenerator;
 import io.github.kerozhai.morphling.mapper.Mapper;
 import io.github.kerozhai.morphling.mapper.MapperFactory;
 import lombok.Data;
 
 public class CollectionTypeMappingTest {
 
-    private static MapperFactory mapperFactory = MapperFactory.defaultMapperFactory();
+    private static MapperFactory mapperFactory;
+
+    static {
+        mapperFactory = new MapperFactory();
+
+        CollectionTypeConversionCodeGenerator collectionTypeConversionCodeGenerator = new CollectionTypeConversionCodeGenerator();
+
+        collectionTypeConversionCodeGenerator.addExcludedCollectionType(List.class);
+
+        mapperFactory.addConversionCodeGenerator(new ArrayTypeConversionCodeGenerator());
+        mapperFactory.addConversionCodeGenerator(collectionTypeConversionCodeGenerator);
+        mapperFactory.addConversionCodeGenerator(new NestedTypeConversionCodeGenerator());
+        mapperFactory.addConversionCodeGenerator(new OptionalTypeConversionCodeGenerator());
+        mapperFactory.addConversionCodeGenerator(new ImmutableTypeConversionCodeGenerator());
+
+        mapperFactory.addFallbackObjectFactory(List.class, (source) -> new ArrayList<>());
+    }
 
     @Data
     public static class Foo {
@@ -137,6 +158,17 @@ public class CollectionTypeMappingTest {
         Target3 target = mapperFactory.getMapperFor(Source3.class, Target3.class).map(source);
 
         assertEquals(source.getNestedList(), target.getNestedList());
+    }
+
+    @Test
+    public void test() {
+        try {
+            Class<?> clazz = Class.forName("java.util.Arrays$ArrayList");
+            System.out.println(clazz.getName());
+        } catch (ClassNotFoundException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
 }
