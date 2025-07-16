@@ -3,6 +3,7 @@ package io.github.kerozhai.morphling.mapper;
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -120,6 +121,9 @@ public final class MapperFactory {
             for (Field targetField : ReflectionUtils.getDeclaredAndInheritedFields(targetClass)) {
                 String targetFieldName = targetField.getName();
                 String sourceFieldName = targetFieldName;
+                String capitalizedTargetFieldName = StringUtils.capitalize(targetFieldName);
+                String sourceGetterName = null;
+                AnnotatedType sourceFieldType = null;
                 AnnotatedType targetFieldType = targetField.getAnnotatedType();
 
                 MappingIgnore mappingIgnore = targetField.getAnnotation(MappingIgnore.class);
@@ -136,18 +140,34 @@ public final class MapperFactory {
                     if (!alias.isEmpty()) {
                         sourceFieldName = alias;
                     }
+
+                    sourceGetterName = mapping.getterName();
                 }
 
-                Field sourceField = ReflectionUtils.findDeclaredOrInheritedField(sourceClass, sourceFieldName);
+                if (StringUtils.isBlank(sourceGetterName)) {
+                    Field sourceField = ReflectionUtils.findDeclaredOrInheritedField(sourceClass, sourceFieldName);
 
-                // Check if sourceClass has the field with the same name
-                if (sourceField != null) {
-                    AnnotatedType sourceFieldType = sourceField.getAnnotatedType();
-                    String capitalizedSourceFieldName = StringUtils.capitalize(sourceFieldName);
-                    String capitalizedTargetFieldName = StringUtils.capitalize(targetFieldName);
-                    String sourceGetter = "source."
-                            + ("boolean".equals(sourceFieldType.getType().getTypeName()) ? "is" : "get")
-                            + capitalizedSourceFieldName + "()";
+                    if (sourceField != null) {
+                        sourceFieldType = sourceField.getAnnotatedType();
+                        String capitalizedSourceFieldName = StringUtils.capitalize(sourceFieldName);
+                        sourceGetterName = ("boolean".equals(sourceFieldType.getType().getTypeName()) ? "is" : "get")
+                                + capitalizedSourceFieldName;
+                    } else {
+                        sourceGetterName = "get" + capitalizedTargetFieldName;
+                    }
+                }
+
+                Method sourceGetterMethod = ReflectionUtils.findDeclaredOrInheritedMethod(sourceClass,
+                        sourceGetterName);
+
+                // Check if sourceClass has the corresponding getter method
+                if (sourceGetterMethod != null) {
+                    String sourceGetter = "source." + sourceGetterName + "()";
+
+                    if (sourceFieldType == null) {
+                        sourceFieldType = sourceGetterMethod.getAnnotatedReturnType();
+                    }
+
                     String targetGetter = "target."
                             + ("boolean".equals(targetFieldType.getType().getTypeName()) ? "is" : "get")
                             + capitalizedTargetFieldName + "()";

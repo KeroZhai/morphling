@@ -19,4 +19,13 @@ public class StringUtils {
     public String capitalize(String string) {
         return string.substring(0, 1).toUpperCase() + string.substring(1);
     }
+
+    public boolean isBlank(String string) {
+        return string == null || string.trim().isEmpty();
+    }
+
+    public boolean isNotBlank(String string) {
+        return !isBlank(string);
+    }
+
 }

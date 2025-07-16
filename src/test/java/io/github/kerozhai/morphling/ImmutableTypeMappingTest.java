@@ -7,6 +7,7 @@ import java.util.Date;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import io.github.kerozhai.morphling.annotation.Mapping;
 import io.github.kerozhai.morphling.codegenerator.ImmutableTypeConversionCodeGenerator;
 import io.github.kerozhai.morphling.mapper.Mapper;
 import io.github.kerozhai.morphling.mapper.MapperFactory;
@@ -27,7 +28,7 @@ public class ImmutableTypeMappingTest {
         private int intValue = 3;
         private long longValue = 4L;
         private float floatValue = 5.1f;
-        private double doubleValue = 6.2;
+        private double doubleValue = 6.2d;
         private String stringValue = "name";
         private State enumValue = State.ON;
         private Date dateValue = new Date();
@@ -86,7 +87,7 @@ public class ImmutableTypeMappingTest {
         private Integer intValue = 3;
         private Long longValue = 4L;
         private Float floatValue = 5.1f;
-        private Double doubleValue = 6.2;
+        private Double doubleValue = 6.2d;
     }
 
     @Data
@@ -129,6 +130,70 @@ public class ImmutableTypeMappingTest {
         assertEquals(target.getLongValue(), target2.getLongValue());
         assertEquals(target.getFloatValue(), target2.getFloatValue());
         assertEquals(target.getDoubleValue(), target2.getDoubleValue());
+    }
+
+
+    public static class Source3 {
+        public boolean isBooleanValue() {
+            return true;
+        }
+
+        public byte getByteValue() {
+            return 0;
+        }
+
+        public char getCharValue() {
+            return '1';
+        }
+
+        public short getShortValue() {
+            return 2;
+        }
+
+        public int getIntValue() {
+            return 3;
+        }
+
+        public long getLongValue() {
+            return 4L;
+        }
+
+        public float getFloatValue() {
+            return 5.1f;
+        }
+
+        public double getDoubleValue() {
+            return 6.2d;
+        }
+    }
+
+    @Data
+    public static class Target3 {
+        @Mapping(getterName = "isBooleanValue")
+        private Boolean booleanValue;
+        private Byte byteValue;
+        private Character charValue;
+        private Short shortValue;
+        private Integer intValue;
+        private Long longValue;
+        private Float floatValue;
+        private Double doubleValue;
+    }
+
+    @Test
+    public void testMappingWithPureGetter() {
+        Source3 source = new Source3();
+        Mapper<Source3, Target3> mapper = mapperFactory.getMapperFor(Source3.class, Target3.class);
+        Target3 target = mapper.map(source);
+
+        assertEquals(source.isBooleanValue(), target.getBooleanValue());
+        assertEquals(source.getByteValue(), target.getByteValue());
+        assertEquals(source.getCharValue(), target.getCharValue());
+        assertEquals(source.getShortValue(), target.getShortValue());
+        assertEquals(source.getIntValue(), target.getIntValue());
+        assertEquals(source.getLongValue(), target.getLongValue());
+        assertEquals(source.getFloatValue(), target.getFloatValue());
+        assertEquals(source.getDoubleValue(), target.getDoubleValue());
     }
 
 }

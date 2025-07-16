@@ -22,6 +22,8 @@ public @interface Mapping {
 
     ValueStrategy valueStrategy() default ValueStrategy.DEFAULT;
 
+    String getterName() default "";
+
     /**
      * The condition to apply the mapping.
      * <p>
