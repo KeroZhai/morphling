@@ -45,7 +45,7 @@ public final class MapperFactory {
     private CtClass objectCtClass = JavassistUtils.getCtClass(POOL, "java.lang.Object");
     private CtClass mapperFactoryCtClass = JavassistUtils.getCtClass(POOL, getClass().getName());
     private List<ConversionCodeGenerator> conversionCodeGenerators = new ArrayList<>();
-    private ConcurrentHashMap<Class<?>, ObjectFactory<?>> fallbackObjecFactories = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<Class<?>, ObjectFactory<?>> fallbackObjectFactories = new ConcurrentHashMap<>();
 
     @SuppressWarnings("rawtypes")
     private ConcurrentHashMap<MapperKey, Mapper> generatedMapperMap = new ConcurrentHashMap<>();
@@ -53,6 +53,7 @@ public final class MapperFactory {
     private ConcurrentHashMap<String, Converter> converterMap = new ConcurrentHashMap<>();
 
     public MapperFactory() {
+        POOL.importPackage("io.github.kerozhai.morphling.annotation");
         POOL.importPackage("io.github.kerozhai.morphling.mapper");
         POOL.importPackage("io.github.kerozhai.morphling.util");
     }
@@ -116,7 +117,8 @@ public final class MapperFactory {
             bodyBuilder.append(sourceClassName).append(" source = ").append("(").append(sourceClassName).append(") $1;")
                     .append(targetClassName)
                     .append(" target = ").append("(").append(targetClassName)
-                    .append(") $2; Context context = $3;");
+                    .append(") $2; Context context = $3; boolean shouldIgnore = false; Class[] ignoreGroups = context.getIgnoreGroups();")
+                    .append(" Mapping$ValueStrategy valueStrategy = context.getValueStrategy();");
 
             for (Field targetField : ReflectionUtils.getDeclaredAndInheritedFields(targetClass)) {
                 String targetFieldName = targetField.getName();
@@ -182,7 +184,7 @@ public final class MapperFactory {
                             .mapping(mapping)
                             .build();
 
-                    bodyBuilder.append("{ boolean shouldIgnore = ");
+                    bodyBuilder.append("{ shouldIgnore = ");
 
                     Mapping.ValueStrategy localValueStrategy = null;
 
@@ -203,11 +205,11 @@ public final class MapperFactory {
 
                             if (groupsToMatch != null) {
                                 bodyBuilder.append(
-                                        "if (context.getIgnoreGroups() != null && context.getIgnoreGroups().length > 0) {")
-                                        .append("for (int i = 0; i < context.getIgnoreGroups().length; i++) {");
+                                        "if (ignoreGroups != null && ignoreGroups.length > 0) {")
+                                        .append("for (int i = 0, size = ignoreGroups.length; i < size; i++) {");
 
                                 for (Class<?> group : groupsToMatch) {
-                                    bodyBuilder.append("if (context.getIgnoreGroups()[i] == ").append(group.getName())
+                                    bodyBuilder.append("if (ignoreGroups[i] == ").append(group.getName())
                                             .append(".class) { shouldIgnore = !shouldIgnore; break; }");
                                 }
 
@@ -243,9 +245,8 @@ public final class MapperFactory {
                     } else {
                         boolean isSourceTypePrimitive = ReflectionUtils.isPrimitiveType(sourceFieldType.getType());
 
-                        bodyBuilder.append("if (context.getValueStrategy() != null) {")
-                                .append("switch (context.getValueStrategy().name()) {")
-                                .append("case \"IF_NOT_NULL\": { shouldIgnore = shouldIgnore || ");
+                        bodyBuilder.append("if (valueStrategy != null) {")
+                                .append("if (valueStrategy == Mapping$ValueStrategy.IF_NOT_NULL) { shouldIgnore = shouldIgnore || ");
 
                         if (isSourceTypePrimitive) {
                             bodyBuilder.append("false;");
@@ -253,8 +254,7 @@ public final class MapperFactory {
                             bodyBuilder.append(generationContext.getSourceVariableName()).append(" == null;");
                         }
 
-                        bodyBuilder.append("break; }")
-                                .append("case \"IF_NOT_EMPTY\": { shouldIgnore = shouldIgnore || ReflectionUtils.isEmpty(");
+                        bodyBuilder.append("} else if (valueStrategy == Mapping$ValueStrategy.IF_NOT_EMPTY) { shouldIgnore = shouldIgnore || ReflectionUtils.isEmpty(");
 
                         if (isSourceTypePrimitive) {
                             bodyBuilder.append(ReflectionUtils.toWrapper(sourceFieldType.getType()).getName())
@@ -263,9 +263,8 @@ public final class MapperFactory {
                         } else {
                             bodyBuilder.append(generationContext.getSourceVariableName()).append(");");
                         }
-                        bodyBuilder.append("break; }")
-                                .append("default: break;")
-                                .append("}}");
+
+                        bodyBuilder.append("}}");
                     }
 
                     bodyBuilder.append("if (!shouldIgnore) {");
@@ -374,12 +373,12 @@ public final class MapperFactory {
     }
 
     public <T> void addFallbackObjectFactory(Class<T> targetClass, ObjectFactory<T> objectFactory) {
-        fallbackObjecFactories.put(targetClass, objectFactory);
+        fallbackObjectFactories.put(targetClass, objectFactory);
     }
 
     public <T> T getFallbackObject(Object source, Class<T> targetClass) {
         @SuppressWarnings("unchecked")
-        ObjectFactory<T> objectFactory = (ObjectFactory<T>) fallbackObjecFactories.get(targetClass);
+        ObjectFactory<T> objectFactory = (ObjectFactory<T>) fallbackObjectFactories.get(targetClass);
 
         if (objectFactory != null) {
             return objectFactory.create(source);
