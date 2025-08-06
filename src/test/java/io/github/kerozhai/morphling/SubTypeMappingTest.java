@@ -1,5 +1,6 @@
 package io.github.kerozhai.morphling;
 
+import static org.junit.Assert.assertNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.Test;
@@ -24,7 +25,7 @@ public class SubTypeMappingTest {
     @EqualsAndHashCode(callSuper = true)
     public static class EntityProxy extends Entity {
 
-        private String name;
+        private String description;
 
     }
 
@@ -33,17 +34,37 @@ public class SubTypeMappingTest {
 
         private String name;
 
+        private String description;
+
     }
 
     @Test
     public void testSubTypeMapping() {
         EntityProxy entityProxy = new EntityProxy();
         entityProxy.setName("entityProxy");
+        entityProxy.setDescription("description");
 
         Mapper<Entity, Dto> mapper = mapperFactory.getMapperFor(Entity.class, Dto.class);
         Dto dto = mapper.map(entityProxy);
 
-        assertEquals(dto.getName(), "entityProxy");
+        assertEquals(dto.getName(), entityProxy.getName());
+        assertNull(dto.getDescription()); // No description field in Entity
+    }
+
+    @Test
+    public void testSubTypeMapping2() {
+        EntityProxy entityProxy = new EntityProxy();
+        entityProxy.setName("entityProxy");
+        entityProxy.setDescription("description");
+
+        Entity entity = entityProxy;
+
+        @SuppressWarnings("unchecked")
+        Mapper<Entity, Dto> mapper = (Mapper<Entity, Dto>) mapperFactory.getMapperFor(entity.getClass(), Dto.class);
+        Dto dto = mapper.map(entityProxy);
+
+        assertEquals(dto.getName(), entityProxy.getName());
+        assertEquals(dto.getDescription(), entityProxy.getDescription());
     }
 
 }
