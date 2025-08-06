@@ -3,7 +3,7 @@
 
   <groupId>io.github.kerozhai</groupId>
   <artifactId>morphling</artifactId>
-  <version>0.2.0</version>
+  <version>0.3.0</version>
 
   <name>Morphling</name>
   <description>A simple yet highly efficient Java library for object mapping.</description>
