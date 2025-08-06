@@ -380,6 +380,10 @@ public final class MapperFactory {
         return null;
     }
 
+    public GenericMapper getGenericMapper() {
+        return new GenericMapper(this);
+    }
+
     private String generateMapperClassNameFor(Class<?> sourceClass, Class<?> targetClass) {
         return sourceClass.getPackage().getName() + "." + StringUtils.classNameToPascalCase(sourceClass.getName())
                 + "To"
