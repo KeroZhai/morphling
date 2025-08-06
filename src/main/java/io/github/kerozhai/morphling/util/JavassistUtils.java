@@ -1,5 +1,6 @@
 package io.github.kerozhai.morphling.util;
 
+import javassist.ClassClassPath;
 import javassist.ClassPool;
 import javassist.CtClass;
 import javassist.CtField;
@@ -10,9 +11,19 @@ import lombok.experimental.UtilityClass;
 @UtilityClass
 public class JavassistUtils {
 
-    public CtClass getCtClass(ClassPool pool, String className) {
+    private ClassPool POOL = ClassPool.getDefault();
+
+    static {
+        POOL.importPackage("io.github.kerozhai.morphling.annotation");
+        POOL.importPackage("io.github.kerozhai.morphling.mapper");
+        POOL.importPackage("io.github.kerozhai.morphling.util");
+    }
+
+    public CtClass getCtClass(Class<?> clazz) {
+        POOL.insertClassPath(new ClassClassPath(clazz));
+
         try {
-            return pool.get(className);
+            return POOL.get(clazz.getName());
         } catch (NotFoundException ignored) {
         }
 
@@ -88,4 +99,7 @@ public class JavassistUtils {
         return isAssignable(ctClass, "java.util.Map");
     }
 
+    public CtClass makeClass(String className) {
+        return POOL.makeClass(className);
+    }
 }

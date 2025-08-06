@@ -28,7 +28,6 @@ import io.github.kerozhai.morphling.util.JavassistUtils;
 import io.github.kerozhai.morphling.util.ReflectionUtils;
 import io.github.kerozhai.morphling.util.StringUtils;
 import javassist.CannotCompileException;
-import javassist.ClassPool;
 import javassist.CtClass;
 import javassist.CtMethod;
 import javassist.CtNewConstructor;
@@ -38,25 +37,19 @@ import javassist.CtNewConstructor;
  */
 public final class MapperFactory {
 
+    private static final CtClass GENERATED_MAPPER_CT_CLASS = JavassistUtils.getCtClass(GeneratedMapper.class);
+    private static final CtClass OBJECT_CT_CLASS = JavassistUtils.getCtClass(Object.class);
+    private static final CtClass MAPPER_FACTORY_CT_CLASS = JavassistUtils.getCtClass(MapperFactory.class);
+    private static final CtClass CONTEXT_CT_CLASS = JavassistUtils.getCtClass(Context.class);
+
     private final String uniqueId = UUID.randomUUID().toString().substring(0, 8);
-    private ClassPool POOL = ClassPool.getDefault();
-    private CtClass abstractMapperCtClass = JavassistUtils.getCtClass(POOL,
-            "io.github.kerozhai.morphling.mapper.GeneratedMapper");
-    private CtClass objectCtClass = JavassistUtils.getCtClass(POOL, "java.lang.Object");
-    private CtClass mapperFactoryCtClass = JavassistUtils.getCtClass(POOL, getClass().getName());
-    private List<ConversionCodeGenerator> conversionCodeGenerators = new ArrayList<>();
-    private ConcurrentHashMap<Class<?>, ObjectFactory<?>> fallbackObjectFactories = new ConcurrentHashMap<>();
+    private final List<ConversionCodeGenerator> conversionCodeGenerators = new ArrayList<>();
+    private final ConcurrentHashMap<Class<?>, ObjectFactory<?>> fallbackObjectFactories = new ConcurrentHashMap<>();
 
     @SuppressWarnings("rawtypes")
-    private ConcurrentHashMap<MapperKey, Mapper> generatedMapperMap = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<MapperKey, Mapper> generatedMapperMap = new ConcurrentHashMap<>();
     @SuppressWarnings("rawtypes")
-    private ConcurrentHashMap<String, Converter> converterMap = new ConcurrentHashMap<>();
-
-    public MapperFactory() {
-        POOL.importPackage("io.github.kerozhai.morphling.annotation");
-        POOL.importPackage("io.github.kerozhai.morphling.mapper");
-        POOL.importPackage("io.github.kerozhai.morphling.util");
-    }
+    private final ConcurrentHashMap<String, Converter> converterMap = new ConcurrentHashMap<>();
 
     public static MapperFactory defaultMapperFactory() {
         MapperFactory instance = new MapperFactory();
@@ -92,27 +85,26 @@ public final class MapperFactory {
     }
 
     public Class<?> generateMapperClassFor(Class<?> sourceClass, Class<?> targetClass) {
-        CtClass contextCtClass = JavassistUtils.getCtClass(POOL, Context.class.getName());
-
         try {
-            CtClass mapperCtClass = POOL.makeClass(generateMapperClassNameFor(sourceClass, targetClass));
+            CtClass mapperCtClass = JavassistUtils.makeClass(generateMapperClassNameFor(sourceClass, targetClass));
             mapperCtClass
-                    .addConstructor(CtNewConstructor.make(new CtClass[] { mapperFactoryCtClass }, null, mapperCtClass));
+                    .addConstructor(
+                            CtNewConstructor.make(new CtClass[] { MAPPER_FACTORY_CT_CLASS }, null, mapperCtClass));
 
             StringBuilder bodyBuilder = new StringBuilder("{\n");
 
-            mapperCtClass.setSuperclass(abstractMapperCtClass);
+            mapperCtClass.setSuperclass(GENERATED_MAPPER_CT_CLASS);
 
             String sourceClassName = sourceClass.getName();
             String targetClassName = targetClass.getName();
-            CtMethod instantiateMethod = new CtMethod(objectCtClass, "instantiate", new CtClass[] { objectCtClass },
+            CtMethod instantiateMethod = new CtMethod(OBJECT_CT_CLASS, "instantiate", new CtClass[] { OBJECT_CT_CLASS },
                     mapperCtClass);
             instantiateMethod.setModifiers(Modifier.PROTECTED);
             instantiateMethod.setBody(generateInstantiateMethodBody(sourceClass, targetClass));
             mapperCtClass.addMethod(instantiateMethod);
 
             CtMethod mapMethod = new CtMethod(CtClass.voidType, "doMap",
-                    new CtClass[] { objectCtClass, objectCtClass, contextCtClass }, mapperCtClass);
+                    new CtClass[] { OBJECT_CT_CLASS, OBJECT_CT_CLASS, CONTEXT_CT_CLASS }, mapperCtClass);
             mapMethod.setModifiers(Modifier.PROTECTED);
             bodyBuilder.append(sourceClassName).append(" source = ").append("(").append(sourceClassName).append(") $1;")
                     .append(targetClassName)
@@ -254,7 +246,8 @@ public final class MapperFactory {
                             bodyBuilder.append(generationContext.getSourceVariableName()).append(" == null;");
                         }
 
-                        bodyBuilder.append("} else if (valueStrategy == Mapping$ValueStrategy.IF_NOT_EMPTY) { shouldIgnore = shouldIgnore || ReflectionUtils.isEmpty(");
+                        bodyBuilder.append(
+                                "} else if (valueStrategy == Mapping$ValueStrategy.IF_NOT_EMPTY) { shouldIgnore = shouldIgnore || ReflectionUtils.isEmpty(");
 
                         if (isSourceTypePrimitive) {
                             bodyBuilder.append(ReflectionUtils.toWrapper(sourceFieldType.getType()).getName())
