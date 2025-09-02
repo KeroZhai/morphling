@@ -12,6 +12,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import io.github.kerozhai.morphling.annotation.Mapping;
 import io.github.kerozhai.morphling.annotation.MappingIgnore;
@@ -51,6 +53,8 @@ public final class MapperFactory {
     @SuppressWarnings("rawtypes")
     private final ConcurrentHashMap<String, Converter> converterMap = new ConcurrentHashMap<>();
 
+    private final ConcurrentHashMap<MapperKey, ReentrantLock> lockMap = new ConcurrentHashMap<>();
+
     public static MapperFactory defaultMapperFactory() {
         MapperFactory instance = new MapperFactory();
 
@@ -71,13 +75,23 @@ public final class MapperFactory {
         Mapper<Source, Target> mapper = generatedMapperMap.get(mapperKey);
 
         if (mapper == null) {
+            Lock lock = lockMap.computeIfAbsent(mapperKey, (key) -> new ReentrantLock());
+
+            lock.lock();
+
             try {
-                mapper = (Mapper<Source, Target>) generateMapperClassFor(sourceClass, targetClass)
-                        .getConstructor(MapperFactory.class).newInstance(this);
-                generatedMapperMap.put(mapperKey, mapper);
-            } catch (InstantiationException | IllegalAccessException | IllegalArgumentException | SecurityException
-                    | InvocationTargetException | NoSuchMethodException e) {
+                mapper = generatedMapperMap.get(mapperKey);
+
+                if (mapper == null) {
+                    mapper = (Mapper<Source, Target>) generateMapperClassFor(sourceClass, targetClass)
+                            .getConstructor(MapperFactory.class).newInstance(this);
+                    generatedMapperMap.put(mapperKey, mapper);
+                }
+            } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
+                    | SecurityException | InvocationTargetException | NoSuchMethodException e) {
                 e.printStackTrace();
+            } finally {
+                lock.unlock();
             }
         }
 
